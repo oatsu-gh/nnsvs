@@ -3,9 +3,8 @@ from functools import partial
 
 import numpy as np
 import torch
-from tqdm.auto import tqdm
-
 from nnsvs.base import BaseModel, PredictionType
+from tqdm.auto import tqdm
 
 
 def extract(a, t, x_shape):
