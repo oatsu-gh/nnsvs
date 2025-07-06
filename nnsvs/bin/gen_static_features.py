@@ -7,9 +7,6 @@ import numpy as np
 import pyworld
 import torch
 from hydra.utils import to_absolute_path
-from omegaconf import DictConfig, OmegaConf
-from tqdm.auto import tqdm
-
 from nnsvs.acoustic_models.util import pad_inference
 from nnsvs.base import PredictionType
 from nnsvs.gen import get_windows
@@ -23,6 +20,8 @@ from nnsvs.multistream import (
 )
 from nnsvs.postfilters import variance_scaling
 from nnsvs.util import StandardScaler, load_utt_list
+from omegaconf import DictConfig, OmegaConf
+from tqdm.auto import tqdm
 
 logger = None
 

@@ -9,13 +9,12 @@ import numpy as np
 import torch
 from hydra.utils import to_absolute_path
 from nnmnkwii.datasets import FileSourceDataset
-from omegaconf import DictConfig, OmegaConf
-from tqdm.auto import tqdm
-
 from nnsvs.base import PredictionType
 from nnsvs.logger import getLogger
 from nnsvs.multistream import get_windows, multi_stream_mlpg
 from nnsvs.train_util import NpyFileSource
+from omegaconf import DictConfig, OmegaConf
+from tqdm.auto import tqdm
 
 logger = None
 

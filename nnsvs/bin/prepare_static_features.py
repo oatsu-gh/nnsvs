@@ -8,12 +8,11 @@ import hydra
 import numpy as np
 import pyworld
 from hydra.utils import to_absolute_path
-from omegaconf import DictConfig, OmegaConf
-from tqdm.auto import tqdm
-
 from nnsvs.logger import getLogger
 from nnsvs.multistream import get_static_features
 from nnsvs.util import get_world_stream_info, load_utt_list
+from omegaconf import DictConfig, OmegaConf
+from tqdm.auto import tqdm
 
 
 def _extract_static_features(

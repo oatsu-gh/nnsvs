@@ -7,10 +7,6 @@ import numpy as np
 import torch
 from hydra.utils import to_absolute_path
 from nnmnkwii.io import hts
-from omegaconf import DictConfig, OmegaConf
-from scipy.io import wavfile
-from tqdm.auto import tqdm
-
 from nnsvs.gen import (
     postprocess_acoustic,
     postprocess_waveform,
@@ -20,6 +16,9 @@ from nnsvs.gen import (
 )
 from nnsvs.logger import getLogger
 from nnsvs.util import extract_static_scaler, init_seed, load_utt_list, load_vocoder
+from omegaconf import DictConfig, OmegaConf
+from scipy.io import wavfile
+from tqdm.auto import tqdm
 
 
 @hydra.main(

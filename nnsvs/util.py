@@ -9,11 +9,10 @@ import pkg_resources
 import pyworld
 import torch
 from hydra.utils import instantiate
-from omegaconf import OmegaConf
-from torch import nn
-
 from nnsvs.multistream import get_static_features, get_static_stream_sizes
 from nnsvs.usfgan import USFGANWrapper
+from omegaconf import OmegaConf
+from torch import nn
 
 try:
     from parallel_wavegan.utils import load_model
