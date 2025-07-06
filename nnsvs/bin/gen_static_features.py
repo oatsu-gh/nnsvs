@@ -7,6 +7,9 @@ import numpy as np
 import pyworld
 import torch
 from hydra.utils import to_absolute_path
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
+
 from nnsvs.acoustic_models.util import pad_inference
 from nnsvs.base import PredictionType
 from nnsvs.gen import get_windows
@@ -20,8 +23,6 @@ from nnsvs.multistream import (
 )
 from nnsvs.postfilters import variance_scaling
 from nnsvs.util import StandardScaler, load_utt_list
-from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
 
 logger = None
 
@@ -105,7 +106,7 @@ def _gen_static_features(
     return out_feats.astype(np.float32)
 
 
-@hydra.main(config_path="conf/gen_static_features", config_name="config")
+@hydra.main(config_path="conf/gen_static_features", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)
@@ -126,6 +127,7 @@ def my_app(config: DictConfig) -> None:
     checkpoint = torch.load(
         to_absolute_path(config.model.checkpoint),
         map_location=lambda storage, loc: storage,
+        weights_only=False,
     )
     model.load_state_dict(checkpoint["state_dict"])
     model.eval()
@@ -233,8 +235,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter
 
 
 if __name__ == "__main__":
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter
