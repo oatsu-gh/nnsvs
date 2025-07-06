@@ -168,7 +168,7 @@ def train_loop(
             return x
 
     else:
-        from tqdm import tqdm
+        from tqdm.auto import tqdm
 
     train_iter = 1
     for epoch in tqdm(range(1, config.train.nepochs + 1)):

@@ -13,7 +13,7 @@ import numpy as np
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import StandardScaler
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from nnsvs.logger import getLogger
 

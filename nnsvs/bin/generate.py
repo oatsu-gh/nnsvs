@@ -10,7 +10,7 @@ import torch
 from hydra.utils import to_absolute_path
 from nnmnkwii.datasets import FileSourceDataset
 from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from nnsvs.base import PredictionType
 from nnsvs.logger import getLogger

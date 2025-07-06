@@ -8,7 +8,7 @@ import pyworld
 import torch
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from nnsvs.acoustic_models.util import pad_inference
 from nnsvs.base import PredictionType
