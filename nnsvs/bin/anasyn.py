@@ -165,7 +165,11 @@ def post_process(wav, sample_rate):
     return wav
 
 
-@hydra.main(config_path="conf/synthesis", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="conf/synthesis",
+    config_name="config",
+    version_base="1.1"
+)
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)

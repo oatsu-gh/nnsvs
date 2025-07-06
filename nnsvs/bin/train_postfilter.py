@@ -431,7 +431,11 @@ def train_loop(
     return last_dev_loss
 
 
-@hydra.main(config_path="conf/train_postfilter", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="conf/train_postfilter",
+    config_name="config",
+    version_base="1.1"
+)
 def my_app(config: DictConfig) -> None:
     # NOTE: set discriminator's in_dim automatically
     if config.model.netD.in_dim is None:

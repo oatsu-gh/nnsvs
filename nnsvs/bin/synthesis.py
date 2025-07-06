@@ -22,7 +22,11 @@ from nnsvs.logger import getLogger
 from nnsvs.util import extract_static_scaler, init_seed, load_utt_list, load_vocoder
 
 
-@hydra.main(config_path="conf/synthesis", config_name="config")
+@hydra.main(
+    config_path="conf/synthesis",
+    config_name="config",
+    version_base="1.1"
+)
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)

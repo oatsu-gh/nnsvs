@@ -10,7 +10,11 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from nnsvs.logger import getLogger
 
 
-@hydra.main(config_path="conf/fit_scaler", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="conf/fit_scaler",
+    config_name="config",
+    version_base="1.1"
+)
 def my_app(config: DictConfig) -> None:
     logger = getLogger(config.verbose)
     logger.info(OmegaConf.to_yaml(config))

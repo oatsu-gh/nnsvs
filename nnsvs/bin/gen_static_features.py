@@ -106,7 +106,11 @@ def _gen_static_features(
     return out_feats.astype(np.float32)
 
 
-@hydra.main(config_path="conf/gen_static_features", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="conf/gen_static_features",
+    config_name="config",
+    version_base="1.1"
+)
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)

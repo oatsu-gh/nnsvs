@@ -76,7 +76,11 @@ def apply_normalization_dir2dir(
         future.result()
 
 
-@hydra.main(config_path="conf/preprocess_normalize", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="conf/preprocess_normalize",
+    config_name="config",
+    version_base="1.1"
+)
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)
