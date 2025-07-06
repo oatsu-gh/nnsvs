@@ -6,6 +6,11 @@ import mlflow
 import torch
 import torch.distributed as dist
 from hydra.utils import to_absolute_path
+from omegaconf import DictConfig
+from torch import nn
+from torch.cuda.amp import autocast
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from nnsvs.base import PredictionType
 from nnsvs.mdn import mdn_get_most_probable_sigma_and_mu, mdn_loss
 from nnsvs.multistream import split_streams
@@ -24,10 +29,6 @@ from nnsvs.train_util import (
     setup,
 )
 from nnsvs.util import PyTorchStandardScaler, make_non_pad_mask, make_pad_mask
-from omegaconf import DictConfig
-from torch import nn
-from torch.cuda.amp import autocast
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 def train_step(
@@ -457,7 +458,7 @@ def train_loop(
     return last_dev_loss
 
 
-@hydra.main(config_path="conf/train_acoustic", config_name="config")
+@hydra.main(config_path="conf/train_acoustic", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     if "max_time_frames" in config.data and config.data.max_time_frames > 0:
         collate_fn = partial(
@@ -557,8 +558,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter
 
 
 if __name__ == "__main__":
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter

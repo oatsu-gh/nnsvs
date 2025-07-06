@@ -7,6 +7,11 @@ import numpy as np
 import torch
 import torch.distributed as dist
 from hydra.utils import to_absolute_path
+from omegaconf import DictConfig
+from torch import nn
+from torch.cuda.amp import autocast
+from torch.nn import functional as F
+
 from nnsvs.multistream import select_streams
 from nnsvs.train_util import (
     collate_fn_default,
@@ -19,10 +24,6 @@ from nnsvs.train_util import (
     setup_gan,
 )
 from nnsvs.util import PyTorchStandardScaler, load_vocoder, make_non_pad_mask
-from omegaconf import DictConfig
-from torch import nn
-from torch.cuda.amp import autocast
-from torch.nn import functional as F
 
 
 def train_step(
@@ -55,8 +56,8 @@ def train_step(
         # NOTE: Assuming 3rd stream is the V/UV
         vuv_idx = np.sum(model_config.stream_sizes[:2])
         is_v = torch.logical_and(
-            out_feats[:, :, vuv_idx : vuv_idx + 1] > 0,
-            in_feats[:, :, vuv_idx : vuv_idx + 1] > 0,
+            out_feats[:, :, vuv_idx: vuv_idx + 1] > 0,
+            in_feats[:, :, vuv_idx: vuv_idx + 1] > 0,
         )
         vuv = is_v
     else:
@@ -430,7 +431,7 @@ def train_loop(
     return last_dev_loss
 
 
-@hydra.main(config_path="conf/train_postfilter", config_name="config")
+@hydra.main(config_path="conf/train_postfilter", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     # NOTE: set discriminator's in_dim automatically
     if config.model.netD.in_dim is None:
@@ -531,8 +532,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter
 
 
 if __name__ == "__main__":
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter

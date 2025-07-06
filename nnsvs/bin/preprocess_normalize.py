@@ -11,10 +11,11 @@ import hydra
 import joblib
 import numpy as np
 from hydra.utils import to_absolute_path
-from nnsvs.logger import getLogger
 from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
+
+from nnsvs.logger import getLogger
 
 logger = None
 
@@ -75,7 +76,7 @@ def apply_normalization_dir2dir(
         future.result()
 
 
-@hydra.main(config_path="conf/preprocess_normalize", config_name="config")
+@hydra.main(config_path="conf/preprocess_normalize", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)
@@ -100,4 +101,4 @@ def entry():
 
 
 if __name__ == "__main__":
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter

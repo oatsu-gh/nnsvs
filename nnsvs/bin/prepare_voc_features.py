@@ -7,11 +7,12 @@ from os.path import exists, islink, join
 import hydra
 import numpy as np
 from hydra.utils import to_absolute_path
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
+
 from nnsvs.logger import getLogger
 from nnsvs.multistream import get_static_features
 from nnsvs.util import get_world_stream_info, load_utt_list
-from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
 
 
 def _prepare_voc_features(
@@ -55,7 +56,7 @@ def _prepare_voc_features(
         os.symlink(join(in_dir, utt_id + "-wave.npy"), save_wave_path)
 
 
-@hydra.main(config_path="conf/prepare_static_features", config_name="config")
+@hydra.main(config_path="conf/prepare_static_features", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     logger = getLogger(config.verbose)
     logger.info(OmegaConf.to_yaml(config))

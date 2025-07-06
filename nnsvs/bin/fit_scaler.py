@@ -4,12 +4,13 @@ import hydra
 import joblib
 import numpy as np
 from hydra.utils import to_absolute_path
-from nnsvs.logger import getLogger
 from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
+from nnsvs.logger import getLogger
 
-@hydra.main(config_path="conf/fit_scaler", config_name="config")
+
+@hydra.main(config_path="conf/fit_scaler", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     logger = getLogger(config.verbose)
     logger.info(OmegaConf.to_yaml(config))

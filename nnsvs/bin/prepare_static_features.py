@@ -8,11 +8,12 @@ import hydra
 import numpy as np
 import pyworld
 from hydra.utils import to_absolute_path
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
+
 from nnsvs.logger import getLogger
 from nnsvs.multistream import get_static_features
 from nnsvs.util import get_world_stream_info, load_utt_list
-from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
 
 
 def _extract_static_features(
@@ -55,7 +56,7 @@ def _extract_static_features(
     np.save(static_path, static_feats, allow_pickle=False)
 
 
-@hydra.main(config_path="conf/prepare_static_features", config_name="config")
+@hydra.main(config_path="conf/prepare_static_features", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     logger = getLogger(config.verbose)
     logger.info(OmegaConf.to_yaml(config))

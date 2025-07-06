@@ -9,19 +9,20 @@ import numpy as np
 import torch
 from hydra.utils import to_absolute_path
 from nnmnkwii.datasets import FileSourceDataset
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
+
 from nnsvs.base import PredictionType
 from nnsvs.logger import getLogger
 from nnsvs.multistream import get_windows, multi_stream_mlpg
 from nnsvs.train_util import NpyFileSource
-from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
 
 logger = None
 
 use_cuda = torch.cuda.is_available()
 
 
-@hydra.main(config_path="conf/generate", config_name="config")
+@hydra.main(config_path="conf/generate", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)
@@ -101,8 +102,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter
 
 
 if __name__ == "__main__":
-    my_app()
+    my_app()  # pylint: disable=no-value-for-parameter
