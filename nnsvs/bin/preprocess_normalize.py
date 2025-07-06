@@ -76,9 +76,7 @@ def apply_normalization_dir2dir(
 
 
 @hydra.main(
-    config_path="conf/preprocess_normalize",
-    config_name="config",
-    version_base="1.1"
+    config_path="conf/preprocess_normalize", config_name="config", version_base="1.1"
 )
 def my_app(config: DictConfig) -> None:
     global logger
@@ -104,4 +102,4 @@ def entry():
 
 
 if __name__ == "__main__":
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()

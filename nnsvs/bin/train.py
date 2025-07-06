@@ -260,11 +260,7 @@ def train_loop(
     return last_dev_loss
 
 
-@hydra.main(
-    config_path="conf/train",
-    config_name="config",
-    version_base="1.1"
-)
+@hydra.main(config_path="conf/train", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     if "max_time_frames" in config.data and config.data.max_time_frames > 0:
         collate_fn = partial(
@@ -339,8 +335,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()
 
 
 if __name__ == "__main__":
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()

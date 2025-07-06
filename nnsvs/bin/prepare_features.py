@@ -78,9 +78,7 @@ def _prepare_acoustic_feature(
 
 
 @hydra.main(
-    config_path="conf/prepare_features",
-    config_name="config",
-    version_base="1.1"
+    config_path="conf/prepare_features", config_name="config", version_base="1.1"
 )
 def my_app(config: DictConfig) -> None:
     global logger
@@ -298,8 +296,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()
 
 
 if __name__ == "__main__":
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()

@@ -21,11 +21,7 @@ logger = None
 use_cuda = torch.cuda.is_available()
 
 
-@hydra.main(
-    config_path="conf/generate",
-    config_name="config",
-    version_base="1.1"
-)
+@hydra.main(config_path="conf/generate", config_name="config", version_base="1.1")
 def my_app(config: DictConfig) -> None:
     global logger
     logger = getLogger(config.verbose)
@@ -54,7 +50,6 @@ def my_app(config: DictConfig) -> None:
             feats = torch.from_numpy(in_feats[idx]).unsqueeze(0).to(device)
 
             if model.prediction_type() == PredictionType.PROBABILISTIC:
-
                 max_mu, max_sigma = model.inference(feats, [feats.shape[1]])
 
                 if np.any(model_config.has_dynamic_features):
@@ -105,8 +100,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()
 
 
 if __name__ == "__main__":
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()

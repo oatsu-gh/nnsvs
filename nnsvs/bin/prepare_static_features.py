@@ -1,5 +1,5 @@
-"""Prepare static features from static + dynamic features
-"""
+"""Prepare static features from static + dynamic features"""
+
 import os
 from concurrent.futures import ProcessPoolExecutor
 from os.path import join
@@ -56,9 +56,7 @@ def _extract_static_features(
 
 
 @hydra.main(
-    config_path="conf/prepare_static_features",
-    config_name="config",
-    version_base="1.1"
+    config_path="conf/prepare_static_features", config_name="config", version_base="1.1"
 )
 def my_app(config: DictConfig) -> None:
     logger = getLogger(config.verbose)
@@ -99,8 +97,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()
 
 
 if __name__ == "__main__":
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()

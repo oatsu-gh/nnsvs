@@ -55,8 +55,8 @@ def train_step(
         # NOTE: Assuming 3rd stream is the V/UV
         vuv_idx = np.sum(model_config.stream_sizes[:2])
         is_v = torch.logical_and(
-            out_feats[:, :, vuv_idx: vuv_idx + 1] > 0,
-            in_feats[:, :, vuv_idx: vuv_idx + 1] > 0,
+            out_feats[:, :, vuv_idx : vuv_idx + 1] > 0,
+            in_feats[:, :, vuv_idx : vuv_idx + 1] > 0,
         )
         vuv = is_v
     else:
@@ -431,9 +431,7 @@ def train_loop(
 
 
 @hydra.main(
-    config_path="conf/train_postfilter",
-    config_name="config",
-    version_base="1.1"
+    config_path="conf/train_postfilter", config_name="config", version_base="1.1"
 )
 def my_app(config: DictConfig) -> None:
     # NOTE: set discriminator's in_dim automatically
@@ -535,8 +533,8 @@ def my_app(config: DictConfig) -> None:
 
 
 def entry():
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()
 
 
 if __name__ == "__main__":
-    my_app()  # pylint: disable=no-value-for-parameter
+    my_app()
