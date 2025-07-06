@@ -44,7 +44,7 @@ from torch.utils import data as data_utils
 from torch.utils.data.sampler import BatchSampler
 from torch.utils.tensorboard import SummaryWriter
 
-plt.style.use("seaborn-whitegrid")
+plt.style.use("seaborn-v0_8-whitegrid")
 
 
 class ShuffleBatchSampler(BatchSampler):
@@ -1055,8 +1055,8 @@ def compute_pitch_regularization_weight(segments, N, decay_size=25, max_w=0.5):
         L = e - s
         w[s:e] = max_w
         if L > decay_size * 2:
-            w[s : s + decay_size] *= torch.arange(decay_size) / decay_size
-            w[e - decay_size : e] *= torch.arange(decay_size - 1, -1, -1) / decay_size
+            w[s: s + decay_size] *= torch.arange(decay_size) / decay_size
+            w[e - decay_size: e] *= torch.arange(decay_size - 1, -1, -1) / decay_size
         else:
             # For shote notes (less than decay_size*0.01 sec) we don't use pitch regularization
             w[s:e] = 0.0
