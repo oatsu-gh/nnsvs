@@ -1,11 +1,10 @@
 import importlib
+import importlib.resources
 import random
-from os.path import join
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pkg_resources
 import pyworld
 import torch
 from hydra.utils import instantiate
@@ -126,6 +125,7 @@ def load_utt_list(utt_list):
     return list(utt_ids)
 
 
+
 def example_xml_file(key="haruga_kita"):
     """Get the path to an included xml file.
 
@@ -138,7 +138,11 @@ def example_xml_file(key="haruga_kita"):
     Raises:
         FileNotFoundError: if the file is not found
     """
-    return pkg_resources.resource_filename(__name__, join(EXAMPLE_DIR, f"{key}.xml"))
+    package_files = importlib.resources.files(__name__)
+    resource_path = package_files / EXAMPLE_DIR / f"{key}.xml"
+
+    with importlib.resources.as_file(resource_path) as file_path:
+        return str(file_path)
 
 
 def init_seed(seed):
