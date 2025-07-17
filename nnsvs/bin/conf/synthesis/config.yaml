@@ -1,3 +1,7 @@
+hydra:
+  job:
+    chdir: true
+
 defaults:
   - timelag: defaults
   - duration: defaults
