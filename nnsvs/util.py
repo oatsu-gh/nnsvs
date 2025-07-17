@@ -55,12 +55,12 @@ def init_weights(net, init_type="normal", init_gain=0.02):
                 nn.init.orthogonal_(m.weight.data, gain=init_gain)
             else:
                 raise NotImplementedError(
-                    "initialization method [%s] is not implemented" % init_type
+                    f"initialization method [{init_type}] is not implemented"
                 )
             if hasattr(m, "bias") and m.bias is not None:
                 nn.init.constant_(m.bias.data, 0.0)
         elif classname.find("BatchNorm2d") != -1:
-            # BatchNorm Layer's weight is not a matrix; only normal distribution applies.
+            # BatchNorm Layer's weight is not a matrix; only normal distribution applies.  # noqa: E501
             nn.init.normal_(m.weight.data, 1.0, init_gain)
             nn.init.constant_(m.bias.data, 0.0)
 
@@ -105,7 +105,7 @@ def get_world_stream_info(
     elif vibrato_mode == "none":
         pass
     else:
-        raise RuntimeError("Unknown vibrato mode: {}".format(vibrato_mode))
+        raise RuntimeError(f"Unknown vibrato mode: {vibrato_mode}")
 
     return stream_sizes
 
@@ -121,7 +121,7 @@ def load_utt_list(utt_list):
     """
     with open(utt_list) as f:
         utt_ids = f.readlines()
-    utt_ids = map(lambda utt_id: utt_id.strip(), utt_ids)
+    utt_ids = (utt_id.strip() for utt_id in utt_ids)
     utt_ids = filter(lambda utt_id: len(utt_id) > 0, utt_ids)
     return list(utt_ids)
 
@@ -185,7 +185,7 @@ def pad_2d(x, max_len, constant_values=0):
         mode="constant",
         constant_values=constant_values,
     )
-    return x
+    return x  # noqa: RET504
 
 
 def make_pad_mask(lengths, xs=None, length_dim=-1, maxlen=None):
@@ -203,7 +203,7 @@ def make_pad_mask(lengths, xs=None, length_dim=-1, maxlen=None):
                 dtype=torch.bool in PyTorch 1.2+ (including 1.2)
     """
     if length_dim == 0:
-        raise ValueError("length_dim cannot be 0: {}".format(length_dim))
+        raise ValueError(f"length_dim cannot be 0: {length_dim}")
 
     if not isinstance(lengths, list):
         lengths = lengths.tolist()
@@ -304,7 +304,7 @@ class MinMaxScaler:
         feature_range (tuple): (min, max)
     """
 
-    def __init__(self, min, scale, data_min=None, data_max=None, feature_range=(0, 1)):
+    def __init__(self, min, scale, data_min=None, data_max=None, feature_range=(0, 1)):  # noqa: A002
         self.min_ = min
         self.scale_ = scale
         self.data_min_ = data_min
@@ -350,7 +350,7 @@ def extract_static_scaler(out_scaler, model_config):
     )
     scale_ = np.concatenate(scale_, -1).reshape(1, -1)
     static_scaler = StandardScaler(mean_, var_, scale_)
-    return static_scaler
+    return static_scaler  # noqa: RET504
 
 
 def load_vocoder(path, device, acoustic_config):
