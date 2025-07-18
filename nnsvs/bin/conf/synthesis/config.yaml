@@ -1,7 +1,3 @@
-hydra:
-  job:
-    chdir: true
-
 defaults:
   - timelag: defaults
   - duration: defaults
@@ -18,3 +14,8 @@ device: cuda # or cpu
 utt_list:
 in_dir:
 out_dir:
+
+# Keep hydra 1.1 behavior on hydra>1.2 -------
+hydra:
+  job:
+    chdir: true

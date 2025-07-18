@@ -12,7 +12,6 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - _self_
 
-
 # Common settings for timelag/duration/acoustic features
 
 verbose: 100
@@ -30,3 +29,8 @@ question_path:
 
 # Musical/linguistic feature extraction common settings
 log_f0_conditioning: true
+
+# Keep hydra 1.1 behavior on hydra>1.2 -------
+hydra:
+  job:
+    chdir: true

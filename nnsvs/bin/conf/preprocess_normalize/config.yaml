@@ -17,3 +17,8 @@ num_workers: 4
 # may need to adjust in 5 to 10.
 # mean-var normalized data is force-clipped to [-threshold, threshold]
 clipping_threshold: 10.0
+
+# Keep hydra 1.1 behavior on hydra>1.2 -------
+hydra:
+  job:
+    chdir: true
