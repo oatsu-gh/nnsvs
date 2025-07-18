@@ -408,7 +408,8 @@ def get_data_loaders(data_config, collate_fn, logger):
     """
     if "filter_long_segments" not in data_config:
         logger.warning(
-            "filter_long_segments is not found in the data config. Consider set it explicitly."
+            "filter_long_segments is not found in the data config. "
+            "Consider set it explicitly."
         )
         logger.info("Disable filtering for long segments.")
         filter_long_segments = False
@@ -417,7 +418,8 @@ def get_data_loaders(data_config, collate_fn, logger):
 
     if "filter_num_frames" not in data_config:
         logger.warning(
-            "filter_num_frames is not found in the data config. Consider set it explicitly."
+            "filter_num_frames is not found in the data config. "
+            "Consider set it explicitly."
         )
         filter_num_frames = 6000
         filter_min_num_frames = 0
@@ -450,7 +452,8 @@ def get_data_loaders(data_config, collate_fn, logger):
         # Dynamic batch size
         if data_config.batch_max_frames > 0:
             logger.debug(
-                f"Dynamic batch size with batch_max_frames={data_config.batch_max_frames}"
+                "Dynamic batch size with batch_max_frames="
+                f"{data_config.batch_max_frames}"
             )
             dataset = Dataset(
                 in_files,
@@ -538,18 +541,14 @@ def set_epochs_based_on_max_steps_(train_config, steps_per_epoch, logger):
         max_train_steps = train_config.nepochs * steps_per_epoch
         train_config.max_train_steps = max_train_steps
         logger.info(
-            "Number of max_train_steps is set based on nepochs: {}".format(
-                max_train_steps
-            )
+            f"Number of max_train_steps is set based on nepochs: {max_train_steps}"
         )
     else:
         # Set nepochs based on max_train_steps
         max_train_steps = train_config.max_train_steps
         epochs = int(np.ceil(max_train_steps / steps_per_epoch))
         train_config.nepochs = epochs
-        logger.info(
-            "Number of epochs is set based on max_train_steps: {}".format(epochs)
-        )
+        logger.info(f"Number of epochs is set based on max_train_steps: {epochs}")
 
     logger.info(f"Number of epochs: {train_config.nepochs}")
     logger.info(f"Number of iterations: {train_config.max_train_steps}")
@@ -588,7 +587,7 @@ def save_checkpoint(
     if is_best:
         path = out_dir / f"best_loss{postfix}.pth"
     else:
-        path = out_dir / "epoch{:04d}{}.pth".format(epoch, postfix)
+        path = out_dir / f"epoch{epoch:04d}{postfix}.pth"
     torch.save(
         {
             "state_dict": model.state_dict(),
@@ -614,6 +613,7 @@ def get_stream_weight(stream_weights, stream_sizes):
 
 
 def _instantiate_optim(optim_config, model):
+    # TODO: Want to use schedule free optimizer (https://github.com/facebookresearch/schedule_free)
     # Optimizer
     optimizer_class = getattr(optim, optim_config.optimizer.name)
     optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
@@ -703,9 +703,7 @@ def setup(config, device, collate_fn=collate_fn_default):
     model = hydra.utils.instantiate(config.model.netG).to(device)
     logger.info(model)
     logger.info(
-        "Number of trainable params: {:.3f} million".format(
-            num_trainable_params(model) / 1000000.0
-        )
+        f"Number of trainable params: {num_trainable_params(model) / 1000000.0:.3f} million"
     )
 
     # Distributed training
@@ -835,9 +833,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
     netG = hydra.utils.instantiate(config.model.netG).to(device)
     logger.info(netG)
     logger.info(
-        "[Generator] Number of trainable params: {:.3f} million".format(
-            num_trainable_params(netG) / 1000000.0
-        )
+        f"[Generator] Number of trainable params: {num_trainable_params(netG) / 1000000.0:.3f} million"
     )
 
     if dist.is_initialized():
@@ -851,9 +847,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
     netD = hydra.utils.instantiate(config.model.netD).to(device)
     logger.info(netD)
     logger.info(
-        "[Discriminator] Number of trainable params: {:.3f} million".format(
-            num_trainable_params(netD) / 1000000.0
-        )
+        f"[Discriminator] Number of trainable params: {num_trainable_params(netD) / 1000000.0:.3f} million"
     )
 
     if dist.is_initialized():
@@ -1525,7 +1519,7 @@ def eval_model(
             vuv_threshold=vuv_threshold,
             max_num_eval_utts=max_num_eval_utts,
         )
-    else:
+    else:  # noqa: RET505
         return eval_mel_model(
             phase=phase,
             step=step,
@@ -1726,7 +1720,7 @@ def eval_spss_model(
                 # (T, D_out) -> (T, static_dim)
                 pred_out_feats_denorm = multi_stream_mlpg(
                     pred_out_feats_denorm,
-                    (out_scaler.scale_ ** 2).cpu().numpy(),
+                    (out_scaler.scale_**2).cpu().numpy(),
                     get_windows(model_config.num_windows),
                     model_config.stream_sizes,
                     model_config.has_dynamic_features,
@@ -1997,9 +1991,9 @@ def eval_mel_model(
                 print(str(e))
 
 
-def _colorbar_wrap(fig, mesh, ax, format="%+2.f dB"):
+def _colorbar_wrap(fig, mesh, ax, fmt="%+2.f dB"):
     try:
-        fig.colorbar(mesh, ax=ax, format=format)
+        fig.colorbar(mesh, ax=ax, format=fmt)
     except IndexError as e:
         # In _quantile_ureduce_func:
         # IndexError: index -1 is out of bounds for axis 0 with size 0
