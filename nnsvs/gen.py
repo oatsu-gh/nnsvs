@@ -318,7 +318,7 @@ def predict_duration(
     pred_durations[pred_durations <= 0] = 1
     pred_durations = np.round(pred_durations)
 
-    return pred_durations
+    return pred_durations  # noqa: RET504
 
 
 def postprocess_duration(labels, pred_durations, lag, frame_period=5):
@@ -385,7 +385,7 @@ def postprocess_duration(labels, pred_durations, lag, frame_period=5):
                 print(
                     f"Negative phoneme durations are predicted at {i}-th note. "
                     "The note duration: ",
-                    f"{round(float(L)*s,3)} sec -> {round(float(L_hat)*s,3)} sec",
+                    f"{round(float(L) * s, 3)} sec -> {round(float(L_hat) * s, 3)} sec",
                 )
                 print(
                     "It's likely that the model couldn't predict correct durations "
@@ -503,7 +503,7 @@ def predict_timing(
 
     # Normalize phoneme durations
     duration_modified_labels = postprocess_duration(labels, durations, lag)
-    return duration_modified_labels
+    return duration_modified_labels  # noqa: RET504
 
 
 @torch.no_grad()
@@ -1068,12 +1068,18 @@ def postprocess_waveform(
         if np.max(np.abs(wav)) > 10:
             # data is likely already in [-32768, 32767]
             wav = wav.astype(np.int16)
-        elif np.max(np.abs(wav)) <= 1:
+        elif np.max(np.abs(wav)) <= 10:
             wav = (wav * 32767.0).astype(np.int16)
         else:
             # may need to handle int32 data (if any)
-            warn("Unexpected waveform range: {} - {}".format(np.min(wav), np.max(wav)))
-            warn("Failed to convert to int16. Returning waveform with floating point.")
+            warn(
+                f"Unexpected waveform range: {np.min(wav)} - {np.max(wav)}",
+                stacklevel=2,
+            )
+            warn(
+                "Failed to convert to int16. Returning waveform with floating point.",
+                stacklevel=2,
+            )
     elif dtype is None:
         pass
     else:
