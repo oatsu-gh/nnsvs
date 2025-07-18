@@ -298,22 +298,22 @@ def predict_duration(
         )
 
         return max_mu, max_sigma_sq
-    else:
-        # (T, D_out)
-        pred_durations = (
-            duration_model.inference(x, [x.shape[1]]).squeeze(0).cpu().data.numpy()
+
+    # (T, D_out)
+    pred_durations = (
+        duration_model.inference(x, [x.shape[1]]).squeeze(0).cpu().data.numpy()
+    )
+    # Apply denormalization
+    pred_durations = duration_out_scaler.inverse_transform(pred_durations)
+    if np.any(duration_config.has_dynamic_features):
+        # (T, D_out) -> (T, static_dim)
+        pred_durations = multi_stream_mlpg(
+            pred_durations,
+            duration_out_scaler.var_,
+            get_windows(duration_config.num_windows),
+            duration_config.stream_sizes,
+            duration_config.has_dynamic_features,
         )
-        # Apply denormalization
-        pred_durations = duration_out_scaler.inverse_transform(pred_durations)
-        if np.any(duration_config.has_dynamic_features):
-            # (T, D_out) -> (T, static_dim)
-            pred_durations = multi_stream_mlpg(
-                pred_durations,
-                duration_out_scaler.var_,
-                get_windows(duration_config.num_windows),
-                duration_config.stream_sizes,
-                duration_config.has_dynamic_features,
-            )
 
     pred_durations[pred_durations <= 0] = 1
     pred_durations = np.round(pred_durations)
@@ -392,10 +392,12 @@ def postprocess_duration(labels, pred_durations, lag, frame_period=5):
                     "for short notes."
                 )
                 print(
-                    f"Variance scaling based durations (in frame):\n{(mu + rho * sigma_sq)}"
+                    "Variance scaling based durations (in frame):\n"
+                    f"{(mu + rho * sigma_sq)}"
                 )
                 print(
-                    f"Fallback to uniform scaling (in frame):\n{(L_hat * mu / mu.sum())}"
+                    "Fallback to uniform scaling (in frame):\n"
+                    f"{(L_hat * mu / mu.sum())}"
                 )
                 d_norm = L_hat * mu / mu.sum()
         else:
@@ -665,7 +667,7 @@ def postprocess_acoustic(
     vibrato_scale=1.0,
     force_fix_vuv=False,
     fill_silence_to_rest=False,
-):
+) -> tuple:
     """Post-process acoustic features
 
     The function converts acoustic features in single ndarray to tuple of
@@ -704,7 +706,7 @@ def postprocess_acoustic(
 
     Returns:
         tuple: Post-processed acoustic features.
-    """
+    """  # noqa: E501
     hts_frame_shift = int(frame_period * 1e4)
     pitch_idx = get_pitch_index(binary_dict, numeric_dict)
 
@@ -853,8 +855,9 @@ def postprocess_acoustic(
 
     if feature_type == "world":
         return mgc, lf0, vuv, bap
-    elif feature_type == "melf0":
+    if feature_type == "melf0":
         return mel, lf0, vuv
+    raise ValueError("Nothing to return")
 
 
 @torch.no_grad()
@@ -1127,7 +1130,7 @@ def _get_nonrest_frame_soft_mask(
     dur = linguistic_features[:, len(binary_dict) + in_note_dur_idx]
     dur_in_sec = dur * 0.01
     for in_sil_idx in in_sil_indices:
-        # Only mask out sil/pau segments over ${silence_threshold} sec. such as long pause
+        # Only mask out sil/pau segments over ${silence_threshold} sec.
         mask[
             (linguistic_features[:, in_sil_idx] > 0) & (dur_in_sec > duration_threshold)
         ] = 0
