@@ -710,20 +710,8 @@ def setup(config, device, collate_fn=collate_fn_default):
     if dist.is_initialized():
         device_id = rank % torch.cuda.device_count()
         model = DDP(model, device_ids=[device_id])
-
-    # Optimizer
-    optimizer_class = getattr(optim, config.train.optim.optimizer.name)
-    optimizer = optimizer_class(
-        model.parameters(), **config.train.optim.optimizer.params
-    )
-
-    # Scheduler
-    lr_scheduler_class = getattr(
-        optim.lr_scheduler, config.train.optim.lr_scheduler.name
-    )
-    lr_scheduler = lr_scheduler_class(
-        optimizer, **config.train.optim.lr_scheduler.params
-    )
+    # Instantiate optimizer and lr_scheduler
+    optimizer, lr_scheduler = _instantiate_optim(config.train.optim, model)
 
     # DataLoader
     data_loaders, samplers = get_data_loaders(config.data, collate_fn, logger)
