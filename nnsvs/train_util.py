@@ -7,6 +7,7 @@ from glob import glob
 from multiprocessing import Manager
 from os.path import join
 from pathlib import Path
+from typing import Union
 
 import hydra
 import joblib
@@ -17,6 +18,7 @@ import mlflow
 import numpy as np
 import pysptk
 import pyworld
+import schedulefree
 import torch
 import torch.distributed as dist
 from hydra.utils import get_original_cwd, to_absolute_path
@@ -67,6 +69,19 @@ class ShuffleBatchSampler(BatchSampler):
 
     def __len__(self):
         return len(self.batches)
+
+
+class DummyLRScheduler(optim.lr_scheduler._LRScheduler):
+    """Dummy learning rate scheduler that does nothing."""
+
+    def __init__(self, optimizer, last_epoch=-1):
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        return [group["lr"] for group in self.optimizer.param_groups]
+
+    def step(self):
+        pass
 
 
 def log_params_from_omegaconf_dict(params):
@@ -612,15 +627,38 @@ def get_stream_weight(stream_weights, stream_sizes):
     return w
 
 
-def _instantiate_optim(optim_config, model):
-    # TODO: Want to use schedule free optimizer (https://github.com/facebookresearch/schedule_free)
-    # Optimizer
-    optimizer_class = getattr(optim, optim_config.optimizer.name)
-    optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
+def _instantiate_optim(
+    optim_config, model
+) -> tuple[optim.Optimizer, Union[optim.lr_scheduler._LRScheduler | None]]:
+    """
+    Instantiate optimizer and learning rate scheduler.
 
-    # Scheduler
-    lr_scheduler_class = getattr(optim.lr_scheduler, optim_config.lr_scheduler.name)
-    lr_scheduler = lr_scheduler_class(optimizer, **optim_config.lr_scheduler.params)
+    Args:
+        optim_config (OmegaConf): Optimizer configuration.
+        model (nn.Module): Model.
+
+    Returns:
+        (tuple): tuple containing optimizer and learning rate scheduler.
+    """
+    # Optimizer
+    optimizer_class = getattr(optim, optim_config.optimizer.name, None)
+
+    # Case1: Use optimizer in torch.optim
+    if optimizer_class is not None:
+        optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
+        lr_scheduler_class = getattr(optim.lr_scheduler, optim_config.lr_scheduler.name)
+        lr_scheduler = lr_scheduler_class(optimizer, **optim_config.lr_scheduler.params)
+
+    # Case2: Use optimizer in schedulefree
+    else:
+        optimizer_class = getattr(schedulefree, optim_config.optimizer.name, None)
+        if optimizer_class is None:
+            raise ValueError(
+                f"Optimizer {optim_config.optimizer.name} not found in torch.optim or schedulefree."
+            )
+        optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
+        # Schedulefree optimizers do not need learning rate schedulers
+        lr_scheduler = DummyLRScheduler(optimizer)
 
     return optimizer, lr_scheduler
 

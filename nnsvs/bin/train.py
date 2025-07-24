@@ -173,6 +173,9 @@ def train_loop(
     for epoch in tqdm(range(1, config.train.nepochs + 1)):
         for phase in data_loaders.keys():
             train = phase.startswith("train")
+            # schedulefree optimizers need training
+            if type(optimizer).__module__.startswith("schedulefree."):
+                optimizer.train() if train else optimizer.eval()
             # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
             if dist.is_initialized() and train and samplers[phase] is not None:
                 samplers[phase].set_epoch(epoch)
@@ -242,7 +245,6 @@ def train_loop(
                 save_checkpoint(
                     logger, out_dir, model, optimizer, lr_scheduler, epoch, is_best=True
                 )
-
         lr_scheduler.step()
         if epoch % config.train.checkpoint_epoch_interval == 0:
             save_checkpoint(
