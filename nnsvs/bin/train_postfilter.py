@@ -21,7 +21,7 @@ from nnsvs.train_util import (
 from nnsvs.util import PyTorchStandardScaler, load_vocoder, make_non_pad_mask
 from omegaconf import DictConfig
 from torch import nn
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from torch.nn import functional as F
 
 
@@ -45,6 +45,7 @@ def train_step(
     mask_nth_mgc_for_adv_loss=0,
     gan_type="lsgan",
     vuv_mask=False,
+    device="cuda",
 ):
     netG.train() if train else netG.eval()
     netD.train() if train else netD.eval()
@@ -63,7 +64,7 @@ def train_step(
         vuv = 1.0
 
     # Run forward
-    with autocast(enabled=grad_scaler is not None):
+    with autocast(device, enabled=grad_scaler is not None):
         pred_out_feats = netG(in_feats, lengths)
 
     real_netD_in_feats = select_streams(
@@ -83,7 +84,7 @@ def train_step(
         fake_netD_in_feats = fake_netD_in_feats[:, :, mask_nth_mgc_for_adv_loss:]
 
     # Real
-    with autocast(enabled=grad_scaler is not None):
+    with autocast(device, enabled=grad_scaler is not None):
         D_real = netD(real_netD_in_feats * vuv, in_feats, lengths)
         # NOTE: must be list of list to support multi-scale discriminators
         assert isinstance(D_real, list) and isinstance(D_real[-1], list)
@@ -98,7 +99,7 @@ def train_step(
     loss_real = 0
     loss_fake = 0
 
-    with autocast(enabled=grad_scaler is not None):
+    with autocast(device, enabled=grad_scaler is not None):
         for idx, (D_real_, D_fake_det_) in enumerate(zip(D_real, D_fake_det)):
             if gan_type == "lsgan":
                 loss_real_ = (D_real_[-1] - 1) ** 2
@@ -158,13 +159,13 @@ def train_step(
             optD.step()
 
     # MSE loss
-    with autocast(enabled=grad_scaler is not None):
+    with autocast(device, enabled=grad_scaler is not None):
         loss_feats = nn.MSELoss(reduction="none")(
             pred_out_feats.masked_select(mask), out_feats.masked_select(mask)
         ).mean()
 
     # adversarial loss
-    with autocast(enabled=grad_scaler is not None):
+    with autocast(device, enabled=grad_scaler is not None):
         D_fake = netD(fake_netD_in_feats * vuv, in_feats, lengths)
 
         loss_adv = 0
@@ -285,9 +286,14 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(range(1, config.train.nepochs + 1)):
+    for epoch in tqdm(range(1, config.train.nepochs + 1), desc="Epochs", colour="blue"):
         for phase in data_loaders.keys():
             train = phase.startswith("train")
+            # schedulefree optimizers need training
+            if type(optG).__module__.startswith("schedulefree."):
+                optG.train() if train else optG.eval()
+            if type(optD).__module__.startswith("schedulefree."):
+                optD.train() if train else optD.eval()
             # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
             if dist.is_initialized() and train and samplers[phase] is not None:
                 samplers[phase].set_epoch(epoch)

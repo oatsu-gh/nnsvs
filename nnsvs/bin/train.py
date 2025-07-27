@@ -23,7 +23,7 @@ from nnsvs.train_util import (
 from nnsvs.util import PyTorchStandardScaler, make_non_pad_mask
 from omegaconf import DictConfig
 from torch import nn
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 
 
 @torch.no_grad()
@@ -56,6 +56,7 @@ def train_step(
     stream_wise_loss=False,
     stream_weights=None,
     stream_sizes=None,
+    device="cuda",
 ):
     model.train() if train else model.eval()
     optimizer.zero_grad()
@@ -81,7 +82,7 @@ def train_step(
         out_feats = model.preprocess_target(out_feats)
 
     # Run forward
-    with autocast(enabled=grad_scaler is not None):
+    with autocast(device, enabled=grad_scaler is not None):
         pred_out_feats = model(in_feats, lengths)
 
     # Mask (B, T, 1)
@@ -93,7 +94,7 @@ def train_step(
         # (B, max(T)) or (B, max(T), D_out)
         mask_ = mask if len(pi.shape) == 4 else mask.squeeze(-1)
         # Compute loss and apply mask
-        with autocast(enabled=grad_scaler is not None):
+        with autocast(device, enabled=grad_scaler is not None):
             loss = mdn_loss(pi, sigma, mu, out_feats, reduce=False)
         loss = loss.masked_select(mask_).mean()
     else:
@@ -103,7 +104,7 @@ def train_step(
             pred_streams = split_streams(pred_out_feats, stream_sizes)
             loss = 0
             for pred_stream, stream, sw in zip(pred_streams, streams, w):
-                with autocast(enabled=grad_scaler is not None):
+                with autocast(device, enabled=grad_scaler is not None):
                     loss += (
                         sw
                         * criterion(
@@ -111,7 +112,7 @@ def train_step(
                         ).mean()
                     )
         else:
-            with autocast(enabled=grad_scaler is not None):
+            with autocast(device, enabled=grad_scaler is not None):
                 loss = criterion(
                     pred_out_feats.masked_select(mask), out_feats.masked_select(mask)
                 ).mean()
@@ -170,7 +171,7 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(range(1, config.train.nepochs + 1)):
+    for epoch in tqdm(range(1, config.train.nepochs + 1), desc="Epochs", colour="blue"):
         for phase in data_loaders.keys():
             train = phase.startswith("train")
             # schedulefree optimizers need training
