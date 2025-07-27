@@ -26,6 +26,7 @@ from torch.nn import functional as F
 
 
 def train_step(
+    device,
     model_config,
     optim_config,
     netG,
@@ -45,7 +46,6 @@ def train_step(
     mask_nth_mgc_for_adv_loss=0,
     gan_type="lsgan",
     vuv_mask=False,
-    device="cuda",
 ):
     netG.train() if train else netG.eval()
     netD.train() if train else netD.eval()
@@ -329,6 +329,7 @@ def train_loop(
                     evaluated = True
 
                 loss, log_metrics = train_step(
+                    device=device,
                     model_config=config.model,
                     optim_config=config.train.optim,
                     netG=netG,
@@ -464,7 +465,7 @@ def my_app(config: DictConfig) -> None:
         torch.accelerator.set_device(device_id)
 
     device = (
-        torch.accelerator.current_device()
+        torch.accelerator.current_accelerator()
         if torch.accelerator.is_available()
         else torch.device("cpu")
     )

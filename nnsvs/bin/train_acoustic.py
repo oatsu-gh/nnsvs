@@ -31,6 +31,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 def train_step(
+    device,
     logger,
     model,
     model_config,
@@ -47,7 +48,6 @@ def train_step(
     pitch_reg_weight=1.0,
     stream_wise_loss=False,
     stream_weights=None,
-    device="cuda",
 ):
     model.train() if train else model.eval()
     optimizer.zero_grad()
@@ -329,9 +329,12 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(range(1, config.train.nepochs + 1)):
+    for epoch in tqdm(range(1, config.train.nepochs + 1), desc="Epochs", color="blue"):
         for phase in data_loaders.keys():
             train = phase.startswith("train")
+            # schedulefree optimizers need training
+            if type(optimizer).__module__.startswith("schedulefree."):
+                optimizer.train() if train else optimizer.eval()
             # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
             if dist.is_initialized() and train and samplers[phase] is not None:
                 samplers[phase].set_epoch(epoch)
@@ -388,6 +391,7 @@ def train_loop(
                     evaluated = True
 
                 loss, log_metrics = train_step(
+                    device=device,
                     logger=logger,
                     model=model,
                     model_config=config.model,
@@ -480,7 +484,7 @@ def my_app(config: DictConfig) -> None:
         torch.accelerator.set_device(device_id)
 
     device = (
-        torch.accelerator.current_device()
+        torch.accelerator.current_accelerator()
         if torch.accelerator.is_available()
         else torch.device("cpu")
     )

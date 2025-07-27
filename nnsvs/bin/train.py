@@ -44,6 +44,7 @@ def compute_distortions(pred_out_feats, out_feats, lengths, out_scaler):
 
 
 def train_step(
+    device,
     model,
     optimizer,
     grad_scaler,
@@ -56,7 +57,6 @@ def train_step(
     stream_wise_loss=False,
     stream_weights=None,
     stream_sizes=None,
-    device="cuda",
 ):
     model.train() if train else model.eval()
     optimizer.zero_grad()
@@ -192,6 +192,7 @@ def train_loop(
                     out_feats[indices].to(device),
                 )
                 loss, log_metrics = train_step(
+                    device=device,
                     model=model,
                     optimizer=optimizer,
                     grad_scaler=grad_scaler,
@@ -279,7 +280,7 @@ def my_app(config: DictConfig) -> None:
         torch.accelerator.set_device(device_id)
 
     device = (
-        torch.accelerator.current_device()
+        torch.accelerator.current_accelerator()
         if torch.accelerator.is_available()
         else torch.device("cpu")
     )
