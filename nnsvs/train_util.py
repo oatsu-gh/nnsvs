@@ -981,7 +981,6 @@ def check_resf0_config(logger, model, config, in_scaler, out_scaler):
             msg = f"model.out_lf0_idx ({model.out_lf0_idx}) and data config out_lf0_idx ({out_lf0_idx}) must be same"
             logger.warning(msg)
             ok = False
-
     if hasattr(model, "in_lf0_min") and hasattr(model, "in_lf0_max"):
         # Inject values from the input scaler
         if model.in_lf0_min is None or model.in_lf0_max is None:
@@ -1043,7 +1042,7 @@ Please consider the following parameters in your model config:
     out_lf0_scale: {out_scaler.scale_[model.out_lf0_idx]}
 """
             )
-        raise ValueError("The model config has wrong configurations.")
+        raise ValueError("The model config has wrong resf0 configurations.")
 
     # Overwrite the parameters to the config
     for key in ["in_lf0_min", "in_lf0_max", "out_lf0_mean", "out_lf0_scale"]:

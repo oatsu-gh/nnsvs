@@ -20,8 +20,7 @@ def noise_like(shape, noise_fn, device, repeat=False):
 
         return noise_fn(*shape_one, device=device).repeat(shape[0], *resid)
 
-    else:
-        return noise_fn(*shape, device=device)
+    return noise_fn(*shape, device=device)
 
 
 def linear_beta_schedule(timesteps, min_beta=1e-4, max_beta=0.06):
@@ -80,8 +79,12 @@ class GaussianDiffusion(BaseModel):
                 scheduler_params = {"s": 0.008}
 
         if encoder is not None:
-            assert encoder.in_dim == in_dim, "encoder input dim must match in_dim"
-        assert out_dim == denoise_fn.in_dim, "denoise_fn input dim must match out_dim"
+            assert encoder.in_dim == in_dim, (
+                f"encoder.in_dim ({encoder.in_dim}) do not match in_dim ({in_dim})"
+            )
+        assert out_dim == denoise_fn.in_dim, (
+            f"denoise_fn.in_dim ({denoise_fn.in_dim}) do not match out_dim ({out_dim})"
+        )
 
         if pndm_speedup:
             raise NotImplementedError("pndm_speedup is not implemented yet")
@@ -320,6 +323,7 @@ class GaussianDiffusion(BaseModel):
                 reversed(range(0, t, iteration_interval)),
                 desc="sample time step",
                 total=t // iteration_interval,
+                leave=False,
             ):
                 x = self.p_sample_plms(
                     x,
@@ -328,7 +332,9 @@ class GaussianDiffusion(BaseModel):
                     cond,
                 )
         else:
-            for i in tqdm(reversed(range(0, t)), desc="sample time step", total=t):
+            for i in tqdm(
+                reversed(range(0, t)), desc="sample time step", total=t, leave=False
+            ):
                 x = self.p_sample(
                     x, torch.full((B,), i, device=device, dtype=torch.long), cond
                 )
