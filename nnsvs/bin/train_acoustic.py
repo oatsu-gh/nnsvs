@@ -329,7 +329,7 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(range(1, config.train.nepochs + 1), desc="Epochs", color="blue"):
+    for epoch in tqdm(range(1, config.train.nepochs + 1), desc="Epochs", color="green"):
         for phase in data_loaders.keys():
             train = phase.startswith("train")
             # schedulefree optimizers need training
