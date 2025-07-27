@@ -112,7 +112,9 @@ class MultistreamSeparateF0ParametricModel(BaseModel):
 
     def forward(self, x, lengths=None, y=None):
         self._set_lf0_params()
-        assert x.shape[-1] == self.in_dim
+        assert x.shape[-1] == self.in_dim, (
+            f"Input dimension {x.shape[-1]} does not match expected {self.in_dim}"
+        )
 
         if y is not None:
             # Teacher-forcing
@@ -156,12 +158,16 @@ class MultistreamSeparateF0ParametricModel(BaseModel):
                 vuv_ = vuv[idx] if isinstance(vuv, list) else vuv
                 bap_ = bap[idx] if isinstance(bap, list) else bap
                 out = torch.cat([mgc_, lf0_, vuv_, bap_], dim=-1)
-                assert out.shape[-1] == self.out_dim
+                assert out.shape[-1] == self.out_dim, (
+                    f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+                )
                 outs.append(out)
             return outs, lf0_residual
         else:
             out = torch.cat([mgc, lf0, vuv, bap], dim=-1)
-            assert out.shape[-1] == self.out_dim
+            assert out.shape[-1] == self.out_dim, (
+                f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+            )
 
         return out, lf0_residual
 
@@ -285,7 +291,9 @@ class NPSSMultistreamParametricModel(BaseModel):
 
     def forward(self, x, lengths=None, y=None):
         self._set_lf0_params()
-        assert x.shape[-1] == self.in_dim
+        assert x.shape[-1] == self.in_dim, (
+            f"Input dimension {x.shape[-1]} does not match expected {self.in_dim}"
+        )
         is_inference = y is None
 
         if is_inference:
@@ -365,11 +373,15 @@ class NPSSMultistreamParametricModel(BaseModel):
                 vuv_ = vuv[idx] if isinstance(vuv, list) else vuv
                 bap_ = bap[idx] if isinstance(bap, list) else bap
                 out = torch.cat([mgc_, lf0_, vuv_, bap_], dim=-1)
-                assert out.shape[-1] == self.out_dim
+                assert out.shape[-1] == self.out_dim, (
+                    f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+                )
                 outs.append(out)
         else:
             outs = torch.cat([mgc, lf0, vuv, bap], dim=-1)
-            assert outs.shape[-1] == self.out_dim
+            assert outs.shape[-1] == self.out_dim, (
+                f"Output dimension {outs.shape[-1]} does not match expected {self.out_dim}"
+            )
 
         return outs, lf0_residual
 
@@ -493,7 +505,9 @@ class NPSSMDNMultistreamParametricModel(BaseModel):
 
     def forward(self, x, lengths=None, y=None):
         self._set_lf0_params()
-        assert x.shape[-1] == self.in_dim
+        assert x.shape[-1] == self.in_dim, (
+            f"Input dimension {x.shape[-1]} does not match expected {self.in_dim}"
+        )
         is_inference = y is None
 
         if is_inference:
@@ -587,7 +601,9 @@ class NPSSMDNMultistreamParametricModel(BaseModel):
             else:
                 mgc_ = mgc
             out = torch.cat([mgc_, lf0_, vuv, bap_], dim=-1)
-            assert out.shape[-1] == self.out_dim
+            assert out.shape[-1] == self.out_dim, (
+                f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+            )
             # TODO: better design
             return out, out
         else:
@@ -689,7 +705,9 @@ class MultistreamSeparateF0MelModel(BaseModel):
 
     def forward(self, x, lengths=None, y=None):
         self._set_lf0_params()
-        assert x.shape[-1] == self.in_dim
+        assert x.shape[-1] == self.in_dim, (
+            f"Input dimension {x.shape[-1]} does not match expected {self.in_dim}"
+        )
 
         if y is not None:
             # Teacher-forcing
@@ -733,7 +751,9 @@ class MultistreamSeparateF0MelModel(BaseModel):
                 lf0_ = lf0[idx] if isinstance(lf0, list) else lf0
                 vuv_ = vuv[idx] if isinstance(vuv, list) else vuv
                 out = torch.cat([mel_, lf0_, vuv_], dim=-1)
-                assert out.shape[-1] == self.out_dim
+                assert out.shape[-1] == self.out_dim, (
+                    f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+                )
                 outs.append(out)
             return outs, lf0_residual
         else:
@@ -745,7 +765,9 @@ class MultistreamSeparateF0MelModel(BaseModel):
                 ],
                 dim=-1,
             )
-            assert out.shape[-1] == self.out_dim
+            assert out.shape[-1] == self.out_dim, (
+                f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+            )
 
         return out, lf0_residual
 
@@ -854,7 +876,9 @@ class MDNMultistreamSeparateF0MelModel(BaseModel):
 
     def forward(self, x, lengths=None, y=None):
         self._set_lf0_params()
-        assert x.shape[-1] == self.in_dim
+        assert x.shape[-1] == self.in_dim, (
+            f"Input dimension {x.shape[-1]} does not match expected {self.in_dim}"
+        )
         is_inference = y is None
 
         if y is not None:
@@ -921,7 +945,9 @@ class MDNMultistreamSeparateF0MelModel(BaseModel):
             else:
                 mel_ = mel
             out = torch.cat([mel_, lf0_, vuv], dim=-1)
-            assert out.shape[-1] == self.out_dim
+            assert out.shape[-1] == self.out_dim, (
+                f"Output dimension {out.shape[-1]} does not match expected {self.out_dim}"
+            )
             # TODO: better design
             return out, out
         else:
