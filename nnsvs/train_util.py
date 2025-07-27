@@ -648,6 +648,7 @@ def _instantiate_optim(
         optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
         lr_scheduler_class = getattr(optim.lr_scheduler, optim_config.lr_scheduler.name)
         lr_scheduler = lr_scheduler_class(optimizer, **optim_config.lr_scheduler.params)
+        # lr_scheduler = DummyLRScheduler(optimizer)
 
     # Case2: Use optimizer in schedulefree
     else:
@@ -972,19 +973,13 @@ def check_resf0_config(logger, model, config, in_scaler, out_scaler):
     ok = True
     if hasattr(model, "in_lf0_idx"):
         if model.in_lf0_idx != in_lf0_idx:
-            logger.warning(
-                "in_lf0_idx in model and data config must be same",
-                model.in_lf0_idx,
-                in_lf0_idx,
-            )
+            msg = f"model.in_lf0_idx ({model.in_lf0_idx}) and data config in_lf0_idx ({in_lf0_idx}) must be same"
+            logger.warning(msg)
             ok = False
     if hasattr(model, "out_lf0_idx"):
         if model.out_lf0_idx != out_lf0_idx:
-            logger.warning(
-                "out_lf0_idx in model and data config must be same",
-                model.out_lf0_idx,
-                out_lf0_idx,
-            )
+            msg = f"model.out_lf0_idx ({model.out_lf0_idx}) and data config out_lf0_idx ({out_lf0_idx}) must be same"
+            logger.warning(msg)
             ok = False
 
     if hasattr(model, "in_lf0_min") and hasattr(model, "in_lf0_max"):
