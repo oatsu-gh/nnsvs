@@ -588,7 +588,7 @@ class BiLSTMResF0NonAttentiveDecoder(BaseModel):
         num_gaussians=4,
         sampling_mode="mean",
         in_ph_start_idx: int = 1,
-        in_ph_end_idx: int = 50,
+        in_ph_end_idx: int = 49,
         embed_dim=None,
         init_type="none",
     ):
@@ -604,7 +604,7 @@ class BiLSTMResF0NonAttentiveDecoder(BaseModel):
         self.in_dim = in_dim
         self.in_ph_start_idx = in_ph_start_idx
         self.in_ph_end_idx = in_ph_end_idx
-        self.num_vocab = in_ph_end_idx - in_ph_start_idx
+        self.num_vocab = in_ph_end_idx - in_ph_start_idx + 1
         self.embed_dim = embed_dim
 
         if self.embed_dim is not None:
@@ -719,7 +719,9 @@ class BiLSTMResF0NonAttentiveDecoder(BaseModel):
             )
             x_ph = torch.argmax(x_ph_onehot, dim=-1)
             # Make sure to have one-hot vector
-            assert (x_ph_onehot.sum(-1) <= 1).all()
+            assert (x_ph_onehot.sum(-1) <= 1).all(), (
+                "Input phoneme features must be one-hot encoded."
+            )
             x = self.emb(x_ph) + self.fc_in(torch.cat([x_first, x_last], dim=-1))
 
         if isinstance(lengths, torch.Tensor):
