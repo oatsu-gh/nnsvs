@@ -67,7 +67,7 @@ def train_step(
     )
 
     # Run forward
-    with autocast(device, enabled=grad_scaler is not None):
+    with autocast(device.type, enabled=grad_scaler is not None):
         outs = model(in_feats, lengths, out_feats)
         if model.has_residual_lf0_prediction():
             pred_out_feats, lf0_residual = outs
@@ -109,7 +109,7 @@ def train_step(
                 # (B, max(T)) or (B, max(T), D_out)
                 mask_ = mask if len(pi.shape) == 4 else mask.squeeze(-1)
                 # Compute loss and apply mask
-                with autocast(device, enabled=grad_scaler is not None):
+                with autocast(device.type, enabled=grad_scaler is not None):
                     loss_feats_ = mdn_loss(
                         pi, sigma, mu, stream, reduce=False
                     ).masked_select(mask_)
@@ -120,7 +120,7 @@ def train_step(
                         N += len(loss_feats_.view(-1))
             else:
                 # non-MDN
-                with autocast(device, enabled=grad_scaler is not None):
+                with autocast(device.type, enabled=grad_scaler is not None):
                     loss_feats_ = criterion(
                         pred_stream.masked_select(mask), stream.masked_select(mask)
                     )
@@ -138,11 +138,11 @@ def train_step(
         # (B, max(T)) or (B, max(T), D_out)
         mask_ = mask if len(pi.shape) == 4 else mask.squeeze(-1)
         # Compute loss and apply mask
-        with autocast(device, enabled=grad_scaler is not None):
+        with autocast(device.type, enabled=grad_scaler is not None):
             loss_feats = mdn_loss(pi, sigma, mu, out_feats, reduce=False)
             loss_feats = loss_feats.masked_select(mask_).mean()
     else:
-        with autocast(device, enabled=grad_scaler is not None):
+        with autocast(device.type, enabled=grad_scaler is not None):
             if not isinstance(pred_out_feats, list):
                 # NOTE: treat as multiple predictions
                 pred_out_feats = [pred_out_feats]
@@ -161,7 +161,7 @@ def train_step(
                     pred_streams = [pred_out_feats_]
                     weights = [1.0]
                 for pred_stream, stream, sw in zip(pred_streams, streams, weights):
-                    with autocast(device, enabled=grad_scaler is not None):
+                    with autocast(device.type, enabled=grad_scaler is not None):
                         loss_feats += (
                             sw
                             * criterion(
@@ -174,7 +174,7 @@ def train_step(
     # NOTE: l1 loss seems to be better than mse loss in my experiments
     # we could use l2 loss as suggested in the sinsy's paper
     if pitch_reg_weight > 0.0 and lf0_residual is not None:
-        with autocast(device, enabled=grad_scaler is not None):
+        with autocast(device.type, enabled=grad_scaler is not None):
             if isinstance(lf0_residual, list):
                 loss_pitch = 0
                 for lf0_residual_ in lf0_residual:
@@ -329,12 +329,9 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(range(1, config.train.nepochs + 1), desc="Epochs", colour="blue"):
+    for epoch in tqdm(range(1, config.train.nepochs + 1)):
         for phase in data_loaders.keys():
             train = phase.startswith("train")
-            # schedulefree optimizers need training
-            if type(optimizer).__module__.startswith("schedulefree."):
-                optimizer.train() if train else optimizer.eval()
             # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
             if dist.is_initialized() and train and samplers[phase] is not None:
                 samplers[phase].set_epoch(epoch)
@@ -479,10 +476,14 @@ def my_app(config: DictConfig) -> None:
     if config.train.use_ddp:
         dist.init_process_group("nccl")
         rank = dist.get_rank()
-        device_id = rank % torch.cuda.device_count()
-        torch.cuda.set_device(device_id)
+        device_id = rank % torch.accelerator.device_count()
+        torch.accelerator.set_device(device_id)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.accelerator.current_device()
+        if torch.accelerator.is_available()
+        else torch.device("cpu")
+    )
 
     (
         model,

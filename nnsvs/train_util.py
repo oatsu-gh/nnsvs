@@ -40,7 +40,7 @@ from nnsvs.util import MinMaxScaler, StandardScaler, init_seed, pad_2d
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from sklearn.preprocessing import MinMaxScaler as SKMinMaxScaler
 from torch import nn, optim
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils import data as data_utils
 from torch.utils.data.sampler import BatchSampler
@@ -734,7 +734,7 @@ def setup(config, device, collate_fn=collate_fn_default):
 
     if "use_amp" in config.train and config.train.use_amp:
         logger.info("Use mixed precision training")
-        grad_scaler = GradScaler()
+        grad_scaler = GradScaler(device.type)
     else:
         grad_scaler = None
 
@@ -852,7 +852,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
 
     if "use_amp" in config.train and config.train.use_amp:
         logger.info("Use mixed precision training")
-        grad_scaler = GradScaler()
+        grad_scaler = GradScaler(device.type)
     else:
         grad_scaler = None
 

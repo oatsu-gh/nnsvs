@@ -64,7 +64,7 @@ def train_step(
         vuv = 1.0
 
     # Run forward
-    with autocast(device, enabled=grad_scaler is not None):
+    with autocast(device.type, enabled=grad_scaler is not None):
         pred_out_feats = netG(in_feats, lengths)
 
     real_netD_in_feats = select_streams(
@@ -84,7 +84,7 @@ def train_step(
         fake_netD_in_feats = fake_netD_in_feats[:, :, mask_nth_mgc_for_adv_loss:]
 
     # Real
-    with autocast(device, enabled=grad_scaler is not None):
+    with autocast(device.type, enabled=grad_scaler is not None):
         D_real = netD(real_netD_in_feats * vuv, in_feats, lengths)
         # NOTE: must be list of list to support multi-scale discriminators
         assert isinstance(D_real, list) and isinstance(D_real[-1], list)
@@ -99,7 +99,7 @@ def train_step(
     loss_real = 0
     loss_fake = 0
 
-    with autocast(device, enabled=grad_scaler is not None):
+    with autocast(device.type, enabled=grad_scaler is not None):
         for idx, (D_real_, D_fake_det_) in enumerate(zip(D_real, D_fake_det)):
             if gan_type == "lsgan":
                 loss_real_ = (D_real_[-1] - 1) ** 2
@@ -159,13 +159,13 @@ def train_step(
             optD.step()
 
     # MSE loss
-    with autocast(device, enabled=grad_scaler is not None):
+    with autocast(device.type, enabled=grad_scaler is not None):
         loss_feats = nn.MSELoss(reduction="none")(
             pred_out_feats.masked_select(mask), out_feats.masked_select(mask)
         ).mean()
 
     # adversarial loss
-    with autocast(device, enabled=grad_scaler is not None):
+    with autocast(device.type, enabled=grad_scaler is not None):
         D_fake = netD(fake_netD_in_feats * vuv, in_feats, lengths)
 
         loss_adv = 0
@@ -460,10 +460,15 @@ def my_app(config: DictConfig) -> None:
     if config.train.use_ddp:
         dist.init_process_group("nccl")
         rank = dist.get_rank()
-        device_id = rank % torch.cuda.device_count()
-        torch.cuda.set_device(device_id)
+        device_id = rank % torch.accelerator.device_count()
+        torch.accelerator.set_device(device_id)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.accelerator.current_device()
+        if torch.accelerator.is_available()
+        else torch.device("cpu")
+    )
+
     (
         (netG, optG, schedulerG),
         (netD, optD, schedulerD),

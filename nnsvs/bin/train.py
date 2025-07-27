@@ -275,10 +275,15 @@ def my_app(config: DictConfig) -> None:
     if config.train.use_ddp:
         dist.init_process_group("nccl")
         rank = dist.get_rank()
-        device_id = rank % torch.cuda.device_count()
-        torch.cuda.set_device(device_id)
+        device_id = rank % torch.accelerator.device_count()
+        torch.accelerator.set_device(device_id)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.accelerator.current_device()
+        if torch.accelerator.is_available()
+        else torch.device("cpu")
+    )
+
     (
         model,
         optimizer,
