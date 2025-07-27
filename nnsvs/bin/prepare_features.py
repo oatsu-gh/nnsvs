@@ -1,4 +1,3 @@
-# coding: utf-8
 import os
 from concurrent.futures import ProcessPoolExecutor
 from os.path import basename, join, splitext
@@ -207,9 +206,7 @@ def my_app(config: DictConfig) -> None:
             num_mels=config.acoustic.num_mels,
         )
     else:
-        raise ValueError(
-            "Unknown feature type: {}".format(config.acoustic.feature_type)
-        )
+        raise ValueError(f"Unknown feature type: {config.acoustic.feature_type}")
 
     in_acoustic = FileSourceDataset(in_acoustic_source)
     out_acoustic = FileSourceDataset(out_acoustic_source)
