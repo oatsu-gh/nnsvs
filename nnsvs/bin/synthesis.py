@@ -100,7 +100,7 @@ def my_app(config: DictConfig) -> None:
     os.makedirs(out_dir, exist_ok=True)
     utt_ids = load_utt_list(to_absolute_path(config.utt_list))
     logger.info("Processes %s utterances...", len(utt_ids))
-    for utt_id in tqdm(utt_ids):
+    for utt_id in tqdm(utt_ids, colour="green"):
         labels = hts.load(join(in_dir, f"{utt_id}.lab"))
         hts_frame_shift = int(config.synthesis.frame_period * 1e4)
         labels.frame_shift = hts_frame_shift
@@ -197,7 +197,9 @@ def my_app(config: DictConfig) -> None:
 
         out_wav_path = join(out_dir, f"{utt_id}.wav")
         wavfile.write(
-            out_wav_path, rate=config.synthesis.sample_rate, data=wav.astype(np.int16)
+            out_wav_path,
+            rate=config.synthesis.sample_rate,
+            data=wav,
         )
 
 
