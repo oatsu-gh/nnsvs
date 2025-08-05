@@ -25,8 +25,6 @@ from tqdm.auto import tqdm
 
 logger = None
 
-use_cuda = torch.cuda.is_available()
-
 
 @torch.no_grad()
 def _gen_static_features(
@@ -35,8 +33,7 @@ def _gen_static_features(
     if model.prediction_type() == PredictionType.PROBABILISTIC:
         if gta:
             raise ValueError("GTA not supported for probabilistic models for now")
-        else:
-            max_mu, max_sigma = model.inference(in_feats, [in_feats.shape[1]])
+        max_mu, max_sigma = model.inference(in_feats, [in_feats.shape[1]])
 
         if np.any(model_config.has_dynamic_features):
             # Apply denormalization
@@ -113,7 +110,13 @@ def my_app(config: DictConfig) -> None:
     logger = getLogger(config.verbose)
     logger.info(OmegaConf.to_yaml(config))
 
-    device = torch.device("cuda" if use_cuda else "cpu")
+    # automatically set the device
+    device = (
+        torch.accelerator.current_accelerator()
+        if torch.accelerator.is_available()
+        else torch.device("cpu")
+    )
+
     utt_list = to_absolute_path(config.utt_list)
     in_dir = to_absolute_path(config.in_dir)
     gt_dir = to_absolute_path(config.gt_dir)

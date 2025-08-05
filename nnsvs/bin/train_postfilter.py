@@ -67,6 +67,11 @@ def train_step(
     with autocast(device.type, enabled=grad_scaler is not None):
         pred_out_feats = netG(in_feats, lengths)
 
+    # Assert shapes of out_feats and pred_out_feats are the same
+    if train and (out_feats.shape != pred_out_feats.shape):
+        error_msg = f"Shape mismatch between out_feats ({out_feats.shape}) and pred_out_feats ({pred_out_feats.shape})"
+        raise ValueError(error_msg)
+
     real_netD_in_feats = select_streams(
         out_feats, model_config.stream_sizes, adv_streams
     )
@@ -482,7 +487,7 @@ def my_app(config: DictConfig) -> None:
         logger,
         _,
         out_scaler,
-    ) = setup_gan(config, device, collate_fn)
+    ) = setup_gan(config, device.type, collate_fn)
 
     path = config.train.pretrained_vocoder_checkpoint
     if path is not None and len(path) > 0:
