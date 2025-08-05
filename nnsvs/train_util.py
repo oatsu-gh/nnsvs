@@ -71,19 +71,6 @@ class ShuffleBatchSampler(BatchSampler):
         return len(self.batches)
 
 
-class DummyLRScheduler(optim.lr_scheduler._LRScheduler):
-    """Dummy learning rate scheduler that does nothing."""
-
-    def __init__(self, optimizer, last_epoch=-1):
-        super().__init__(optimizer, last_epoch)
-
-    def get_lr(self):
-        return [group["lr"] for group in self.optimizer.param_groups]
-
-    def step(self):
-        pass
-
-
 def log_params_from_omegaconf_dict(params):
     for param_name, element in params.items():
         _explore_recursive(param_name, element)
@@ -628,7 +615,7 @@ def get_stream_weight(stream_weights, stream_sizes):
 
 
 def _instantiate_optim(
-    optim_config, model
+    logger, optim_config, model
 ) -> tuple[optim.Optimizer, Union[optim.lr_scheduler._LRScheduler | None]]:
     """
     Instantiate optimizer and learning rate scheduler.
@@ -640,34 +627,38 @@ def _instantiate_optim(
     Returns:
         (tuple): tuple containing optimizer and learning rate scheduler.
     """
-    # Optimizer
+    # Case1: Try to use optimizer and lr_scheduler in torch.optim
     optimizer_class = getattr(optim, optim_config.optimizer.name, None)
-
-    # Case1: Use optimizer in torch.optim
     if optimizer_class is not None:
         optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
         lr_scheduler_class = getattr(optim.lr_scheduler, optim_config.lr_scheduler.name)
         lr_scheduler = lr_scheduler_class(optimizer, **optim_config.lr_scheduler.params)
-        # lr_scheduler = DummyLRScheduler(optimizer)
+        return optimizer, lr_scheduler
 
-    # Case2: Use optimizer in schedulefree
-    else:
-        optimizer_class = getattr(schedulefree, optim_config.optimizer.name, None)
-        if optimizer_class is None:
-            raise ValueError(
-                f"Optimizer {optim_config.optimizer.name} not found in torch.optim or schedulefree."
-            )
+    # Case2: Try to use optimizer in "schedulefree" module
+    optimizer_class = getattr(schedulefree, optim_config.optimizer.name, None)
+    if optimizer_class is not None:
         optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
-        # Schedulefree optimizers do not need learning rate schedulers
-        lr_scheduler = DummyLRScheduler(optimizer)
+        # Schedulefree optimizers do not need learning rate schedulers.
+        # Use ConstantLR with factor=1.0 as a dummy-LR-scheduler
+        lr_scheduler = optim.ConstantLR(optimizer, factor=1.0)
+        if optim.lr_scheduler.lr_scheduler is not None:
+            warn_msg = f"lr_scheduler {optim.lr_scheduler.lr_scheduler} is specified in config, but is never used for schedulefree-optimizers"
+            logger.warn(warn_msg)
+        return optimizer, lr_scheduler
 
-    return optimizer, lr_scheduler
+    # Case3: Unsupported optimizer
+    error_msg = f"Optimizer {optim_config.optimizer.name} not found in torch.optim or schedulefree."
+    raise ValueError(error_msg)
 
 
 def _resume(logger, resume_config, model, optimizer, lr_scheduler):
     if resume_config.checkpoint is not None and len(resume_config.checkpoint) > 0:
         logger.info("Load weights from %s", resume_config.checkpoint)
-        checkpoint = torch.load(to_absolute_path(resume_config.checkpoint))
+        logger.info("Load optimizer: %s", resume_config.load_optimizer)
+        checkpoint = torch.load(
+            to_absolute_path(resume_config.checkpoint), weights_only=False
+        )
         state_dict = checkpoint["state_dict"]
         model_dict = model.state_dict()
         valid_state_dict = {
@@ -734,7 +725,7 @@ def setup(config, device, collate_fn=collate_fn_default):
 
     if "use_amp" in config.train and config.train.use_amp:
         logger.info("Use mixed precision training")
-        grad_scaler = GradScaler(device.type)
+        grad_scaler = GradScaler(device)
     else:
         grad_scaler = None
 
@@ -750,7 +741,7 @@ def setup(config, device, collate_fn=collate_fn_default):
         device_id = rank % torch.cuda.device_count()
         model = DDP(model, device_ids=[device_id])
     # Instantiate optimizer and lr_scheduler
-    optimizer, lr_scheduler = _instantiate_optim(config.train.optim, model)
+    optimizer, lr_scheduler = _instantiate_optim(logger, config.train.optim, model)
 
     # DataLoader
     data_loaders, samplers = get_data_loaders(config.data, collate_fn, logger)
@@ -868,7 +859,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
         netG = DDP(netG, device_ids=[device_id])
 
     # Optimizer and LR scheduler for G
-    optG, schedulerG = _instantiate_optim(config.train.optim.netG, netG)
+    optG, schedulerG = _instantiate_optim(logger, config.train.optim.netG, netG)
 
     # Model D
     netD = hydra.utils.instantiate(config.model.netD).to(device)
@@ -882,7 +873,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
         netD = DDP(netD, device_ids=[device_id])
 
     # Optimizer and LR scheduler for D
-    optD, schedulerD = _instantiate_optim(config.train.optim.netD, netD)
+    optD, schedulerD = _instantiate_optim(logger, config.train.optim.netD, netD)
 
     # DataLoader
     data_loaders, samplers = get_data_loaders(config.data, collate_fn, logger)
