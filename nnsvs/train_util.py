@@ -379,7 +379,6 @@ def collate_fn_random_segments(batch, max_time_frames=256):
     """
     xs, ys = [b[0] for b in batch], [b[1] for b in batch]
     lengths = [len(x[0]) for x in batch]
-
     start_frames = np.array(
         [np.random.randint(0, xl - max_time_frames) for xl in lengths]
     )
@@ -641,9 +640,9 @@ def _instantiate_optim(
         optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
         # Schedulefree optimizers do not need learning rate schedulers.
         # Use ConstantLR with factor=1.0 as a dummy-LR-scheduler
-        lr_scheduler = optim.ConstantLR(optimizer, factor=1.0)
-        if optim.lr_scheduler.lr_scheduler is not None:
-            warn_msg = f"lr_scheduler {optim.lr_scheduler.lr_scheduler} is specified in config, but is never used for schedulefree-optimizers"
+        lr_scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+        if optim_config.lr_scheduler.name is not None:
+            warn_msg = f"lr_scheduler {optim_config.lr_scheduler.name} is specified in config, but is never used for schedulefree-optimizers"
             logger.warn(warn_msg)
         return optimizer, lr_scheduler
 
