@@ -1079,7 +1079,7 @@ def postprocess_waveform(
                 f"Seems int16 but too loud: {np.min(wav)} - {np.max(wav)}", stacklevel=2
             )
             warn("Render waveform with floating point", stacklevel=2)
-            wav = (wav * 32767.0).astype(np.float32)
+            wav = (wav).astype(np.float32)
 
         else:
             # may need to handle int32 data (if any)
