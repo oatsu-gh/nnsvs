@@ -20,7 +20,7 @@ def denorm_f0(
     if pitch_norm == "standard":
         f0 = f0 * f0_std + f0_mean
     elif pitch_norm == "log":
-        f0 = 2 ** f0
+        f0 = 2**f0
 
     if min is not None:
         f0 = f0.clamp(min=min)
@@ -319,7 +319,7 @@ class ConvBlock(nn.Module):
         elif self.norm == "ln":
             self.norm = LayerNorm(n_chans // 16, n_chans)
         elif self.norm == "wn":
-            self.conv = torch.nn.utils.weight_norm(self.conv.conv)
+            self.conv = torch.nn.utils.parametrizations.weight_norm(self.conv.conv)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
 
@@ -448,7 +448,7 @@ class PitchExtractor(nn.Module):
         lf0, uv = pitch_pred[:, :, 0], pitch_pred[:, :, 1]
 
         # f0
-        f0 = 2 ** lf0
+        f0 = 2**lf0
 
         # log(f0)
         lf0 = torch.log(f0)

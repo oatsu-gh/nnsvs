@@ -6,7 +6,7 @@ from torch import nn
 def Conv1d(in_channels, out_channels, kernel_size, *args, **kwargs):
     """Weight-normalized Conv1d layer."""
     m = conv.Conv1d(in_channels, out_channels, kernel_size, *args, **kwargs)
-    return nn.utils.weight_norm(m)
+    return nn.utils.parametrizations.weight_norm(m)
 
 
 def Conv1d1x1(in_channels, out_channels, bias=True):

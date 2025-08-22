@@ -160,7 +160,7 @@ class USFGANGenerator(nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv1d) or isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)
@@ -350,7 +350,7 @@ class CascadeHnUSFGANGenerator(nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv1d) or isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)
@@ -538,7 +538,7 @@ class ParallelHnUSFGANGenerator(nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv1d) or isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)

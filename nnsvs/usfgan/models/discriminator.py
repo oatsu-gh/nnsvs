@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2022 Reo Yoneyama (Nagoya University)
 #  MIT License (https://opensource.org/licenses/MIT)
 
@@ -58,7 +56,7 @@ class PWGDiscriminator(nn.Module):
                 If set to true, it will be applied to all of the conv layers.
 
         """
-        super(PWGDiscriminator, self).__init__()
+        super().__init__()
         assert (kernel_size - 1) % 2 == 0, "Not support even number kernel size."
         assert dilation_factor > 0, "Dilation factor must be > 0."
         self.conv_layers = nn.ModuleList()
@@ -67,7 +65,7 @@ class PWGDiscriminator(nn.Module):
             if i == 0:
                 dilation = 1
             else:
-                dilation = i if dilation_factor == 1 else dilation_factor ** i
+                dilation = i if dilation_factor == 1 else dilation_factor**i
                 conv_in_channels = conv_channels
             padding = (kernel_size - 1) // 2 * dilation
             conv_layer = [
@@ -117,30 +115,33 @@ class PWGDiscriminator(nn.Module):
 
         if return_fmaps:
             return [x], fmaps
-        else:
-            return [x]
+        return [x]
 
     def apply_weight_norm(self):
         """Apply weight normalization module from all of the layers."""
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv1d) or isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)
 
     def remove_weight_norm(self):
         """Remove weight normalization module from all of the layers."""
+        self.remove_parametrizations("weight")
 
-        def _remove_weight_norm(m):
+    def remove_parametrizations(self, tensor_name: str):
+        """Remove the parametrizations"""
+
+        def _remove_parametrizations(m, tensor_name: str):
             try:
-                logger.debug(f"Weight norm is removed from {m}.")
-                nn.utils.remove_weight_norm(m)
-            except ValueError:  # this module didn't have weight norm
+                logger.debug(f"Parametrizations ({tensor_name}) are removed from {m}.")
+                nn.utils.parametrize.remove_parametrizations(m, tensor_name)
+            except ValueError:  # this module didn't have the parameter
                 return
 
-        self.apply(_remove_weight_norm)
+        self.apply(_remove_parametrizations)
 
 
 class HiFiGANPeriodDiscriminator(nn.Module):
@@ -263,7 +264,7 @@ class HiFiGANPeriodDiscriminator(nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)
@@ -489,7 +490,7 @@ class HiFiGANScaleDiscriminator(nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)
@@ -819,7 +820,7 @@ class UnivNetSpectralDiscriminator(nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, nn.Conv2d):
-                nn.utils.weight_norm(m)
+                nn.utils.parametrizations.weight_norm(m)
                 logger.debug(f"Weight norm is applied to {m}.")
 
         self.apply(_apply_weight_norm)
