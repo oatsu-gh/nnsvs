@@ -18,11 +18,20 @@ import mlflow
 import numpy as np
 import pysptk
 import pyworld
-import schedulefree
 import torch
 import torch.distributed as dist
 from hydra.utils import get_original_cwd, to_absolute_path
 from nnmnkwii import metrics
+from omegaconf import DictConfig, ListConfig, OmegaConf
+from sklearn.preprocessing import MinMaxScaler as SKMinMaxScaler
+from torch import nn
+from torch.amp import GradScaler
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils import data as data_utils
+from torch.utils.data.sampler import BatchSampler
+from torch.utils.tensorboard import SummaryWriter
+
+from nnsvs import optimizers as optim
 from nnsvs.base import PredictionType
 from nnsvs.gen import gen_world_params
 from nnsvs.logger import getLogger
@@ -37,14 +46,6 @@ from nnsvs.multistream import (
 )
 from nnsvs.pitch import lowpass_filter, note_segments
 from nnsvs.util import MinMaxScaler, StandardScaler, init_seed, pad_2d
-from omegaconf import DictConfig, ListConfig, OmegaConf
-from sklearn.preprocessing import MinMaxScaler as SKMinMaxScaler
-from torch import nn, optim
-from torch.amp import GradScaler
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils import data as data_utils
-from torch.utils.data.sampler import BatchSampler
-from torch.utils.tensorboard import SummaryWriter
 
 plt.style.use("seaborn-v0_8-whitegrid")
 
@@ -614,7 +615,7 @@ def get_stream_weight(stream_weights, stream_sizes):
 
 
 def _instantiate_optim(
-    logger, optim_config, model
+    optim_config, model
 ) -> tuple[optim.Optimizer, Union[optim.lr_scheduler._LRScheduler | None]]:
     """
     Instantiate optimizer and learning rate scheduler.
@@ -626,29 +627,13 @@ def _instantiate_optim(
     Returns:
         (tuple): tuple containing optimizer and learning rate scheduler.
     """
-    # Case1: Try to use optimizer and lr_scheduler in torch.optim
-    optimizer_class = getattr(optim, optim_config.optimizer.name, None)
-    if optimizer_class is not None:
-        optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
-        lr_scheduler_class = getattr(optim.lr_scheduler, optim_config.lr_scheduler.name)
-        lr_scheduler = lr_scheduler_class(optimizer, **optim_config.lr_scheduler.params)
-        return optimizer, lr_scheduler
-
-    # Case2: Try to use optimizer in "schedulefree" module
-    optimizer_class = getattr(schedulefree, optim_config.optimizer.name, None)
-    if optimizer_class is not None:
-        optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
-        # Schedulefree optimizers do not need learning rate schedulers.
-        # Use ConstantLR with factor=1.0 as a dummy-LR-scheduler
-        lr_scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
-        if optim_config.lr_scheduler.name is not None:
-            warn_msg = f"lr_scheduler {optim_config.lr_scheduler.name} is specified in config, but is never used for schedulefree-optimizers"
-            logger.warn(warn_msg)
-        return optimizer, lr_scheduler
-
-    # Case3: Unsupported optimizer
-    error_msg = f"Optimizer {optim_config.optimizer.name} not found in torch.optim or schedulefree."
-    raise ValueError(error_msg)
+    # Optimizer
+    optimizer_class = getattr(optim, optim_config.optimizer.name)
+    optimizer = optimizer_class(model.parameters(), **optim_config.optimizer.params)
+    # Scheduler
+    lr_scheduler_class = getattr(optim.lr_scheduler, optim_config.lr_scheduler.name)
+    lr_scheduler = lr_scheduler_class(optimizer, **optim_config.lr_scheduler.params)
+    return optimizer, lr_scheduler
 
 
 def _resume(logger, resume_config, model, optimizer, lr_scheduler):
@@ -740,7 +725,7 @@ def setup(config, device, collate_fn=collate_fn_default):
         device_id = rank % torch.cuda.device_count()
         model = DDP(model, device_ids=[device_id])
     # Instantiate optimizer and lr_scheduler
-    optimizer, lr_scheduler = _instantiate_optim(logger, config.train.optim, model)
+    optimizer, lr_scheduler = _instantiate_optim(config.train.optim, model)
 
     # DataLoader
     data_loaders, samplers = get_data_loaders(config.data, collate_fn, logger)
@@ -858,7 +843,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
         netG = DDP(netG, device_ids=[device_id])
 
     # Optimizer and LR scheduler for G
-    optG, schedulerG = _instantiate_optim(logger, config.train.optim.netG, netG)
+    optG, schedulerG = _instantiate_optim(config.train.optim.netG, netG)
 
     # Model D
     netD = hydra.utils.instantiate(config.model.netD).to(device)
@@ -872,7 +857,7 @@ def setup_gan(config, device, collate_fn=collate_fn_default):
         netD = DDP(netD, device_ids=[device_id])
 
     # Optimizer and LR scheduler for D
-    optD, schedulerD = _instantiate_optim(logger, config.train.optim.netD, netD)
+    optD, schedulerD = _instantiate_optim(config.train.optim.netD, netD)
 
     # DataLoader
     data_loaders, samplers = get_data_loaders(config.data, collate_fn, logger)
@@ -2391,4 +2376,5 @@ def plot_mel_params(
         a.set_ylim(0, sr // 2)
     plt.tight_layout()
     writer.add_figure(f"{group}/Spectrogram", fig, step)
+    plt.close()
     plt.close()
