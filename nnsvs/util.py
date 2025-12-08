@@ -8,10 +8,11 @@ import numpy as np
 import pyworld
 import torch
 from hydra.utils import instantiate
-from nnsvs.multistream import get_static_features, get_static_stream_sizes
-from nnsvs.usfgan import USFGANWrapper
 from omegaconf import OmegaConf
 from torch import nn
+
+from nnsvs.multistream import get_static_features, get_static_stream_sizes
+from nnsvs.usfgan import USFGANWrapper
 
 try:
     from parallel_wavegan.utils import load_model
@@ -123,7 +124,6 @@ def load_utt_list(utt_list):
     utt_ids = (utt_id.strip() for utt_id in utt_ids)
     utt_ids = filter(lambda utt_id: len(utt_id) > 0, utt_ids)
     return list(utt_ids)
-
 
 
 def example_xml_file(key="haruga_kita"):
@@ -391,6 +391,7 @@ def load_vocoder(path, device, acoustic_config):
         checkpoint = torch.load(
             path,
             map_location=lambda storage, loc: storage,
+            weights_only=False,
         )
 
         vocoder = instantiate(vocoder_config.generator).to(device)
