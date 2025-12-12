@@ -395,7 +395,23 @@ def load_vocoder(path, device, acoustic_config):
         )
 
         vocoder = instantiate(vocoder_config.generator).to(device)
-        vocoder.load_state_dict(checkpoint["model"]["generator"])
+
+        # Convert old weight_norm format to new parametrizations format for PyTorch 2.0+
+        state_dict = checkpoint["model"]["generator"]
+        # Convert parametrizations.weight.original0 -> weight_g
+        # Convert parametrizations.weight.original1 -> weight_v
+        converted_state_dict = {
+            k.replace(
+                "parametrizations.weight.original0",
+                "weight_g",
+            ).replace(
+                "parametrizations.weight.original1",
+                "weight_v",
+            ): v
+            for k, v in state_dict.items()
+        }
+        vocoder.load_state_dict(converted_state_dict)
+
         vocoder.remove_weight_norm()
         vocoder = USFGANWrapper(vocoder_config, vocoder)
 
