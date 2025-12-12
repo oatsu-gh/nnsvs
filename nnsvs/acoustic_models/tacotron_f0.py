@@ -604,7 +604,7 @@ class BiLSTMResF0NonAttentiveDecoder(BaseModel):
         self.in_dim = in_dim
         self.in_ph_start_idx = in_ph_start_idx
         self.in_ph_end_idx = in_ph_end_idx
-        self.num_vocab = in_ph_end_idx - in_ph_start_idx + 1
+        self.num_vocab = in_ph_end_idx - in_ph_start_idx
         self.embed_dim = embed_dim
 
         if self.embed_dim is not None:
