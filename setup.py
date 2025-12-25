@@ -34,7 +34,7 @@ setup(
         "pyworld",
         "tensorboard",
         "nnmnkwii",
-        "pysinsy",
+        # "pysinsy",
         "pyloudnorm",
     ],
     extras_require={
