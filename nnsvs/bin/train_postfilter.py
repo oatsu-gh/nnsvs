@@ -23,6 +23,7 @@ from omegaconf import DictConfig
 from torch import nn
 from torch.amp import autocast
 from torch.nn import functional as F
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 
 def train_step(
@@ -291,104 +292,126 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(
-        range(1, config.train.nepochs + 1), desc="Epochs", colour="green"
-    ):
-        for phase in data_loaders.keys():
-            train = phase.startswith("train")
-            # schedulefree optimizers need training
-            if type(optG).__module__.startswith("schedulefree."):
-                optG.train() if train else optG.eval()
-            if type(optD).__module__.startswith("schedulefree."):
-                optD.train() if train else optD.eval()
-            # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
-            if dist.is_initialized() and train and samplers[phase] is not None:
-                samplers[phase].set_epoch(epoch)
-            running_loss = 0
-            running_metrics = {}
-            evaluated = False
-            for in_feats, out_feats, lengths in tqdm(
-                data_loaders[phase], desc=f"{phase} iter", leave=False
-            ):
-                # NOTE: This is needed for pytorch's PackedSequence
-                lengths, indices = torch.sort(lengths, dim=0, descending=True)
-                in_feats, out_feats = (
-                    in_feats[indices].to(device),
-                    out_feats[indices].to(device),
-                )
-                if (not train) and (not evaluated):
-                    eval_model(
-                        phase,
-                        epoch,
-                        netG,
-                        in_feats,
-                        out_feats,
-                        lengths,
-                        config.model,
-                        out_scaler,
-                        writer,
-                        sr=config.data.sample_rate,
-                        use_world_codec=config.data.use_world_codec,
-                        vocoder=vocoder,
-                        vocoder_in_scaler=vocoder_in_scaler,
-                        max_num_eval_utts=config.train.max_num_eval_utts,
+    with logging_redirect_tqdm():
+        for epoch in tqdm(
+            range(1, config.train.nepochs + 1), desc="Epochs", colour="green"
+        ):
+            for phase in data_loaders.keys():
+                train = phase.startswith("train")
+                # schedulefree optimizers need training
+                if type(optG).__module__.startswith("schedulefree."):
+                    optG.train() if train else optG.eval()
+                if type(optD).__module__.startswith("schedulefree."):
+                    optD.train() if train else optD.eval()
+                # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
+                if dist.is_initialized() and train and samplers[phase] is not None:
+                    samplers[phase].set_epoch(epoch)
+                running_loss = 0
+                running_metrics = {}
+                evaluated = False
+                for in_feats, out_feats, lengths in tqdm(
+                    data_loaders[phase], desc=f"{phase} iter", leave=False
+                ):
+                    # NOTE: This is needed for pytorch's PackedSequence
+                    lengths, indices = torch.sort(lengths, dim=0, descending=True)
+                    in_feats, out_feats = (
+                        in_feats[indices].to(device),
+                        out_feats[indices].to(device),
                     )
-                    evaluated = True
+                    if (not train) and (not evaluated):
+                        eval_model(
+                            phase,
+                            epoch,
+                            netG,
+                            in_feats,
+                            out_feats,
+                            lengths,
+                            config.model,
+                            out_scaler,
+                            writer,
+                            sr=config.data.sample_rate,
+                            use_world_codec=config.data.use_world_codec,
+                            vocoder=vocoder,
+                            vocoder_in_scaler=vocoder_in_scaler,
+                            max_num_eval_utts=config.train.max_num_eval_utts,
+                        )
+                        evaluated = True
 
-                loss, log_metrics = train_step(
-                    device=device,
-                    model_config=config.model,
-                    optim_config=config.train.optim,
-                    netG=netG,
-                    optG=optG,
-                    netD=netD,
-                    optD=optD,
-                    grad_scaler=grad_scaler,
-                    train=train,
-                    in_feats=in_feats,
-                    out_feats=out_feats,
-                    lengths=lengths,
-                    out_scaler=out_scaler,
-                    mse_weight=config.train.mse_weight,
-                    adv_weight=config.train.adv_weight,
-                    adv_streams=adv_streams,
-                    fm_weight=config.train.fm_weight,
-                    mask_nth_mgc_for_adv_loss=config.train.mask_nth_mgc_for_adv_loss,
-                    gan_type=config.train.gan_type,
-                    vuv_mask=config.train.vuv_mask,
-                )
+                    loss, log_metrics = train_step(
+                        device=device,
+                        model_config=config.model,
+                        optim_config=config.train.optim,
+                        netG=netG,
+                        optG=optG,
+                        netD=netD,
+                        optD=optD,
+                        grad_scaler=grad_scaler,
+                        train=train,
+                        in_feats=in_feats,
+                        out_feats=out_feats,
+                        lengths=lengths,
+                        out_scaler=out_scaler,
+                        mse_weight=config.train.mse_weight,
+                        adv_weight=config.train.adv_weight,
+                        adv_streams=adv_streams,
+                        fm_weight=config.train.fm_weight,
+                        mask_nth_mgc_for_adv_loss=config.train.mask_nth_mgc_for_adv_loss,
+                        gan_type=config.train.gan_type,
+                        vuv_mask=config.train.vuv_mask,
+                    )
 
-                if train:
-                    if writer is not None:
-                        for key, val in log_metrics.items():
-                            writer.add_scalar(f"{key}_Step/{phase}", val, train_iter)
-                    train_iter += 1
+                    if train:
+                        if writer is not None:
+                            for key, val in log_metrics.items():
+                                writer.add_scalar(
+                                    f"{key}_Step/{phase}", val, train_iter
+                                )
+                        train_iter += 1
 
-                running_loss += loss.item()
-                for k, v in log_metrics.items():
-                    try:
-                        running_metrics[k] += float(v)
-                    except KeyError:
-                        running_metrics[k] = float(v)
+                    running_loss += loss.item()
+                    for k, v in log_metrics.items():
+                        try:
+                            running_metrics[k] += float(v)
+                        except KeyError:
+                            running_metrics[k] = float(v)
 
-            ave_loss = running_loss / len(data_loaders[phase])
-            logger.info("[%s] [Epoch %s]: loss %s", phase, epoch, ave_loss)
-            if writer is not None:
-                writer.add_scalar(f"Loss_Epoch/{phase}", ave_loss, epoch)
-            if use_mlflow:
-                mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
-
-            for k, v in running_metrics.items():
-                ave_v = v / len(data_loaders[phase])
+                ave_loss = running_loss / len(data_loaders[phase])
+                logger.info("[%s] [Epoch %s]: loss %s", phase, epoch, ave_loss)
                 if writer is not None:
-                    writer.add_scalar(f"{k}_Epoch/{phase}", ave_v, epoch)
+                    writer.add_scalar(f"Loss_Epoch/{phase}", ave_loss, epoch)
                 if use_mlflow:
-                    mlflow.log_metric(f"{phase}_{k}", ave_v, step=epoch)
+                    mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
 
-            if not train:
-                last_dev_loss = ave_loss
-            if not train and ave_loss < best_dev_loss:
-                best_dev_loss = ave_loss
+                for k, v in running_metrics.items():
+                    ave_v = v / len(data_loaders[phase])
+                    if writer is not None:
+                        writer.add_scalar(f"{k}_Epoch/{phase}", ave_v, epoch)
+                    if use_mlflow:
+                        mlflow.log_metric(f"{phase}_{k}", ave_v, step=epoch)
+
+                if not train:
+                    last_dev_loss = ave_loss
+                if not train and ave_loss < best_dev_loss:
+                    best_dev_loss = ave_loss
+                    for model, opt, scheduler, postfix in [
+                        (netG, optG, schedulerG, ""),
+                        (netD, optD, schedulerD, "_D"),
+                    ]:
+                        save_checkpoint(
+                            logger,
+                            out_dir,
+                            model,
+                            opt,
+                            scheduler,
+                            epoch,
+                            is_best=True,
+                            postfix=postfix,
+                        )
+
+            schedulerG.step()
+            schedulerD.step()
+
+            if epoch % config.train.checkpoint_epoch_interval == 0:
                 for model, opt, scheduler, postfix in [
                     (netG, optG, schedulerG, ""),
                     (netD, optD, schedulerD, "_D"),
@@ -400,28 +423,9 @@ def train_loop(
                         opt,
                         scheduler,
                         epoch,
-                        is_best=True,
+                        is_best=False,
                         postfix=postfix,
                     )
-
-        schedulerG.step()
-        schedulerD.step()
-
-        if epoch % config.train.checkpoint_epoch_interval == 0:
-            for model, opt, scheduler, postfix in [
-                (netG, optG, schedulerG, ""),
-                (netD, optD, schedulerD, "_D"),
-            ]:
-                save_checkpoint(
-                    logger,
-                    out_dir,
-                    model,
-                    opt,
-                    scheduler,
-                    epoch,
-                    is_best=False,
-                    postfix=postfix,
-                )
 
     for model, opt, scheduler, postfix in [
         (netG, optG, schedulerG, ""),

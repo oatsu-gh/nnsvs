@@ -28,6 +28,7 @@ from omegaconf import DictConfig
 from torch import nn
 from torch.amp import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 
 def train_step(
@@ -329,129 +330,146 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(
-        range(1, config.train.nepochs + 1), desc="Epochs", colour="green"
-    ):
-        for phase in data_loaders.keys():
-            train = phase.startswith("train")
-            # schedulefree optimizers need training
-            if type(optimizer).__module__.startswith("schedulefree."):
-                optimizer.train() if train else optimizer.eval()
-            # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
-            if dist.is_initialized() and train and samplers[phase] is not None:
-                samplers[phase].set_epoch(epoch)
-            running_loss = 0
-            running_metrics = {}
-            evaluated = False
-            for in_feats, out_feats, lengths in tqdm(
-                data_loaders[phase], desc=f"{phase} iter", leave=False
-            ):
-                # NOTE: This is needed for pytorch's PackedSequence
-                lengths, indices = torch.sort(lengths, dim=0, descending=True)
-                in_feats, out_feats = (
-                    in_feats[indices].to(device),
-                    out_feats[indices].to(device),
-                )
-                # Compute denormalized log-F0 in the musical scores
-                with torch.no_grad():
-                    lf0_score_denorm = (
-                        in_feats[:, :, in_lf0_idx] - in_scaler.min_[in_lf0_idx]
-                    ) / in_scaler.scale_[in_lf0_idx]
-                    # Fill zeros for rest and padded frames
-                    lf0_score_denorm *= (in_feats[:, :, in_rest_idx] <= 0).float()
-                    lf0_score_denorm[make_pad_mask(lengths)] = 0
-
-                    # Compute time-variant pitch regularization weight vector
-                    # NOTE: the current impl. is very slow
-                    if pitch_reg_weight > 0.0:
-                        pitch_reg_dyn_ws = compute_batch_pitch_regularization_weight(
-                            lf0_score_denorm,
-                            decay_size=config.train.pitch_reg_decay_size,
-                        )
-                    else:
-                        pitch_reg_dyn_ws = 1.0
-
-                if (not train) and (not evaluated):
-                    eval_model(
-                        phase,
-                        epoch,
-                        model,
-                        in_feats,
-                        out_feats,
-                        lengths,
-                        config.model,
-                        out_scaler,
-                        writer,
-                        sr=sr,
-                        lf0_score_denorm=lf0_score_denorm,
-                        use_world_codec=config.data.use_world_codec,
-                        vocoder=vocoder,
-                        vocoder_in_scaler=vocoder_in_scaler,
-                        vocoder_config=vocoder_config,
-                        max_num_eval_utts=config.train.max_num_eval_utts,
+    with logging_redirect_tqdm():
+        for epoch in tqdm(
+            range(1, config.train.nepochs + 1), desc="Epochs", colour="green"
+        ):
+            for phase in data_loaders.keys():
+                train = phase.startswith("train")
+                # schedulefree optimizers need training
+                if type(optimizer).__module__.startswith("schedulefree."):
+                    optimizer.train() if train else optimizer.eval()
+                # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
+                if dist.is_initialized() and train and samplers[phase] is not None:
+                    samplers[phase].set_epoch(epoch)
+                running_loss = 0
+                running_metrics = {}
+                evaluated = False
+                for in_feats, out_feats, lengths in tqdm(
+                    data_loaders[phase], desc=f"{phase} iter", leave=False
+                ):
+                    # NOTE: This is needed for pytorch's PackedSequence
+                    lengths, indices = torch.sort(lengths, dim=0, descending=True)
+                    in_feats, out_feats = (
+                        in_feats[indices].to(device),
+                        out_feats[indices].to(device),
                     )
-                    evaluated = True
+                    # Compute denormalized log-F0 in the musical scores
+                    with torch.no_grad():
+                        lf0_score_denorm = (
+                            in_feats[:, :, in_lf0_idx] - in_scaler.min_[in_lf0_idx]
+                        ) / in_scaler.scale_[in_lf0_idx]
+                        # Fill zeros for rest and padded frames
+                        lf0_score_denorm *= (in_feats[:, :, in_rest_idx] <= 0).float()
+                        lf0_score_denorm[make_pad_mask(lengths)] = 0
 
-                loss, log_metrics = train_step(
-                    device=device,
-                    logger=logger,
-                    model=model,
-                    model_config=config.model,
-                    optim_config=config.train.optim,
-                    optimizer=optimizer,
-                    grad_scaler=grad_scaler,
-                    train=train,
-                    in_feats=in_feats,
-                    out_feats=out_feats,
-                    lengths=lengths,
-                    out_scaler=out_scaler,
-                    feats_criterion=feats_criterion,
-                    stream_wise_loss=config.train.stream_wise_loss,
-                    stream_weights=config.model.stream_weights,
-                    pitch_reg_dyn_ws=pitch_reg_dyn_ws,
-                    pitch_reg_weight=pitch_reg_weight,
-                )
+                        # Compute time-variant pitch regularization weight vector
+                        # NOTE: the current impl. is very slow
+                        if pitch_reg_weight > 0.0:
+                            pitch_reg_dyn_ws = (
+                                compute_batch_pitch_regularization_weight(
+                                    lf0_score_denorm,
+                                    decay_size=config.train.pitch_reg_decay_size,
+                                )
+                            )
+                        else:
+                            pitch_reg_dyn_ws = 1.0
 
-                if train:
-                    if writer is not None:
-                        for key, val in log_metrics.items():
-                            writer.add_scalar(f"{key}_Step/{phase}", val, train_iter)
-                    train_iter += 1
+                    if (not train) and (not evaluated):
+                        eval_model(
+                            phase,
+                            epoch,
+                            model,
+                            in_feats,
+                            out_feats,
+                            lengths,
+                            config.model,
+                            out_scaler,
+                            writer,
+                            sr=sr,
+                            lf0_score_denorm=lf0_score_denorm,
+                            use_world_codec=config.data.use_world_codec,
+                            vocoder=vocoder,
+                            vocoder_in_scaler=vocoder_in_scaler,
+                            vocoder_config=vocoder_config,
+                            max_num_eval_utts=config.train.max_num_eval_utts,
+                        )
+                        evaluated = True
 
-                running_loss += loss.item()
-                for k, v in log_metrics.items():
-                    try:
-                        running_metrics[k] += float(v)
-                    except KeyError:
-                        running_metrics[k] = float(v)
+                    loss, log_metrics = train_step(
+                        device=device,
+                        logger=logger,
+                        model=model,
+                        model_config=config.model,
+                        optim_config=config.train.optim,
+                        optimizer=optimizer,
+                        grad_scaler=grad_scaler,
+                        train=train,
+                        in_feats=in_feats,
+                        out_feats=out_feats,
+                        lengths=lengths,
+                        out_scaler=out_scaler,
+                        feats_criterion=feats_criterion,
+                        stream_wise_loss=config.train.stream_wise_loss,
+                        stream_weights=config.model.stream_weights,
+                        pitch_reg_dyn_ws=pitch_reg_dyn_ws,
+                        pitch_reg_weight=pitch_reg_weight,
+                    )
 
-            ave_loss = running_loss / len(data_loaders[phase])
-            logger.info("[%s] [Epoch %s]: loss %s", phase, epoch, ave_loss)
-            if writer is not None:
-                writer.add_scalar(f"Loss_Epoch/{phase}", ave_loss, epoch)
-            if use_mlflow:
-                mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
+                    if train:
+                        if writer is not None:
+                            for key, val in log_metrics.items():
+                                writer.add_scalar(
+                                    f"{key}_Step/{phase}", val, train_iter
+                                )
+                        train_iter += 1
 
-            for k, v in running_metrics.items():
-                ave_v = v / len(data_loaders[phase])
+                    running_loss += loss.item()
+                    for k, v in log_metrics.items():
+                        try:
+                            running_metrics[k] += float(v)
+                        except KeyError:
+                            running_metrics[k] = float(v)
+
+                ave_loss = running_loss / len(data_loaders[phase])
+                logger.info("[%s] [Epoch %s]: loss %s", phase, epoch, ave_loss)
                 if writer is not None:
-                    writer.add_scalar(f"{k}_Epoch/{phase}", ave_v, epoch)
+                    writer.add_scalar(f"Loss_Epoch/{phase}", ave_loss, epoch)
                 if use_mlflow:
-                    mlflow.log_metric(f"{phase}_{k}", ave_v, step=epoch)
+                    mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
 
-            if not train:
-                last_dev_loss = ave_loss
-            if not train and ave_loss < best_dev_loss:
-                best_dev_loss = ave_loss
+                for k, v in running_metrics.items():
+                    ave_v = v / len(data_loaders[phase])
+                    if writer is not None:
+                        writer.add_scalar(f"{k}_Epoch/{phase}", ave_v, epoch)
+                    if use_mlflow:
+                        mlflow.log_metric(f"{phase}_{k}", ave_v, step=epoch)
+
+                if not train:
+                    last_dev_loss = ave_loss
+                if not train and ave_loss < best_dev_loss:
+                    best_dev_loss = ave_loss
+                    save_checkpoint(
+                        logger,
+                        out_dir,
+                        model,
+                        optimizer,
+                        lr_scheduler,
+                        epoch,
+                        is_best=True,
+                    )
+
+            lr_scheduler.step()
+            if epoch % config.train.checkpoint_epoch_interval == 0:
                 save_checkpoint(
-                    logger, out_dir, model, optimizer, lr_scheduler, epoch, is_best=True
+                    logger,
+                    out_dir,
+                    model,
+                    optimizer,
+                    lr_scheduler,
+                    epoch,
+                    is_best=False,
                 )
-
-        lr_scheduler.step()
-        if epoch % config.train.checkpoint_epoch_interval == 0:
-            save_checkpoint(
-                logger, out_dir, model, optimizer, lr_scheduler, epoch, is_best=False
-            )
 
     save_checkpoint(
         logger, out_dir, model, optimizer, lr_scheduler, config.train.nepochs

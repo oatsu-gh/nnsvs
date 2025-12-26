@@ -24,6 +24,7 @@ from nnsvs.util import PyTorchStandardScaler, make_non_pad_mask
 from omegaconf import DictConfig
 from torch import nn
 from torch.amp import autocast
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 
 @torch.no_grad()
@@ -171,89 +172,104 @@ def train_loop(
         from tqdm.auto import tqdm
 
     train_iter = 1
-    for epoch in tqdm(
-        range(1, config.train.nepochs + 1), desc="Epochs", colour="green"
-    ):
-        for phase in data_loaders.keys():
-            train = phase.startswith("train")
-            # schedulefree optimizers need training
-            if type(optimizer).__module__.startswith("schedulefree."):
-                optimizer.train() if train else optimizer.eval()
-            # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
-            if dist.is_initialized() and train and samplers[phase] is not None:
-                samplers[phase].set_epoch(epoch)
-            running_loss = 0
-            running_metrics = {}
-            for in_feats, out_feats, lengths in tqdm(
-                data_loaders[phase], desc=f"{phase} iter", leave=False
-            ):
-                # NOTE: This is needed for pytorch's PackedSequence
-                lengths, indices = torch.sort(lengths, dim=0, descending=True)
-                in_feats, out_feats = (
-                    in_feats[indices].to(device),
-                    out_feats[indices].to(device),
-                )
-                loss, log_metrics = train_step(
-                    device=device,
-                    model=model,
-                    optimizer=optimizer,
-                    grad_scaler=grad_scaler,
-                    train=train,
-                    in_feats=in_feats,
-                    out_feats=out_feats,
-                    lengths=lengths,
-                    out_scaler=out_scaler,
-                    feats_criterion=feats_criterion,
-                    stream_wise_loss=config.train.stream_wise_loss,
-                    stream_weights=config.model.stream_weights,
-                    stream_sizes=config.model.stream_sizes,
-                )
+    with logging_redirect_tqdm():
+        for epoch in tqdm(
+            range(1, config.train.nepochs + 1), desc="Epochs", colour="green"
+        ):
+            for phase in data_loaders.keys():
+                train = phase.startswith("train")
+                # schedulefree optimizers need training
+                if type(optimizer).__module__.startswith("schedulefree."):
+                    optimizer.train() if train else optimizer.eval()
+                # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
+                if dist.is_initialized() and train and samplers[phase] is not None:
+                    samplers[phase].set_epoch(epoch)
+                running_loss = 0
+                running_metrics = {}
+                for in_feats, out_feats, lengths in tqdm(
+                    data_loaders[phase], desc=f"{phase} iter", leave=False
+                ):
+                    # NOTE: This is needed for pytorch's PackedSequence
+                    lengths, indices = torch.sort(lengths, dim=0, descending=True)
+                    in_feats, out_feats = (
+                        in_feats[indices].to(device),
+                        out_feats[indices].to(device),
+                    )
+                    loss, log_metrics = train_step(
+                        device=device,
+                        model=model,
+                        optimizer=optimizer,
+                        grad_scaler=grad_scaler,
+                        train=train,
+                        in_feats=in_feats,
+                        out_feats=out_feats,
+                        lengths=lengths,
+                        out_scaler=out_scaler,
+                        feats_criterion=feats_criterion,
+                        stream_wise_loss=config.train.stream_wise_loss,
+                        stream_weights=config.model.stream_weights,
+                        stream_sizes=config.model.stream_sizes,
+                    )
 
-                if train:
-                    if writer is not None:
-                        for key, val in log_metrics.items():
-                            writer.add_scalar(f"{key}_Step/{phase}", val, train_iter)
-                    train_iter += 1
+                    if train:
+                        if writer is not None:
+                            for key, val in log_metrics.items():
+                                writer.add_scalar(
+                                    f"{key}_Step/{phase}", val, train_iter
+                                )
+                        train_iter += 1
 
-                running_loss += loss.item()
-                for k, v in log_metrics.items():
-                    try:
-                        running_metrics[k] += float(v)
-                    except KeyError:
-                        running_metrics[k] = float(v)
+                    running_loss += loss.item()
+                    for k, v in log_metrics.items():
+                        try:
+                            running_metrics[k] += float(v)
+                        except KeyError:
+                            running_metrics[k] = float(v)
 
-            ave_loss = running_loss / len(data_loaders[phase])
-            if writer is not None:
-                writer.add_scalar(f"Loss/{phase}", ave_loss, epoch)
-            if use_mlflow:
-                mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
-
-            ave_loss = running_loss / len(data_loaders[phase])
-            logger.info("[%s] [Epoch %s]: loss %s", phase, epoch, ave_loss)
-            if writer is not None:
-                writer.add_scalar(f"Loss_Epoch/{phase}", ave_loss, epoch)
-            if use_mlflow:
-                mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
-
-            for k, v in running_metrics.items():
-                ave_v = v / len(data_loaders[phase])
+                ave_loss = running_loss / len(data_loaders[phase])
                 if writer is not None:
-                    writer.add_scalar(f"{k}_Epoch/{phase}", ave_v, epoch)
+                    writer.add_scalar(f"Loss/{phase}", ave_loss, epoch)
                 if use_mlflow:
-                    mlflow.log_metric(f"{phase}_{k}", ave_v, step=epoch)
+                    mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
 
-            if not train:
-                last_dev_loss = ave_loss
-            if not train and ave_loss < best_dev_loss:
-                best_dev_loss = ave_loss
+                ave_loss = running_loss / len(data_loaders[phase])
+                logger.info("[%s] [Epoch %s]: loss %s", phase, epoch, ave_loss)
+                if writer is not None:
+                    writer.add_scalar(f"Loss_Epoch/{phase}", ave_loss, epoch)
+                if use_mlflow:
+                    mlflow.log_metric(f"{phase}_loss", ave_loss, step=epoch)
+
+                for k, v in running_metrics.items():
+                    ave_v = v / len(data_loaders[phase])
+                    if writer is not None:
+                        writer.add_scalar(f"{k}_Epoch/{phase}", ave_v, epoch)
+                    if use_mlflow:
+                        mlflow.log_metric(f"{phase}_{k}", ave_v, step=epoch)
+
+                if not train:
+                    last_dev_loss = ave_loss
+                if not train and ave_loss < best_dev_loss:
+                    best_dev_loss = ave_loss
+                    save_checkpoint(
+                        logger,
+                        out_dir,
+                        model,
+                        optimizer,
+                        lr_scheduler,
+                        epoch,
+                        is_best=True,
+                    )
+            lr_scheduler.step()
+            if epoch % config.train.checkpoint_epoch_interval == 0:
                 save_checkpoint(
-                    logger, out_dir, model, optimizer, lr_scheduler, epoch, is_best=True
+                    logger,
+                    out_dir,
+                    model,
+                    optimizer,
+                    lr_scheduler,
+                    epoch,
+                    is_best=False,
                 )
-        lr_scheduler.step()
-        if epoch % config.train.checkpoint_epoch_interval == 0:
-            save_checkpoint(
-                logger, out_dir, model, optimizer, lr_scheduler, epoch, is_best=False
-            )
 
     save_checkpoint(
         logger, out_dir, model, optimizer, lr_scheduler, config.train.nepochs
